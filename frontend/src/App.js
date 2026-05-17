@@ -82,7 +82,7 @@ function App() {
 
   const loadAdminStats = async () => {
     try {
-      const response = await axios.get("http://localhost:8080/api/admin/stats");
+      const response = await axios.get("https://ai-resume-analyzer-backend-z6g8.onrender.com/api/admin/stats");
       setAdminStats(response.data);
     } catch (error) {
       console.error("Failed to load admin stats", error);
@@ -101,7 +101,7 @@ function App() {
     try {
       setLoading(true);
       const response = await axios.post(
-        "http://localhost:8080/api/resumes/upload-and-analyze",
+        "https://ai-resume-analyzer-backend-z6g8.onrender.com/api/resumes/upload-and-analyze",
         formData,
         {
           headers: {
@@ -136,7 +136,7 @@ function App() {
     try {
       setLoading(true);
       const response = await axios.post(
-        "http://localhost:8080/api/resumes/match-job",
+        "https://ai-resume-analyzer-backend-z6g8.onrender.com/api/resumes/match-job",
         formData,
         {
           headers: {
@@ -164,7 +164,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "http://localhost:8080/api/resumes/generate-report",
+        "https://ai-resume-analyzer-backend-z6g8.onrender.com/api/resumes/generate-report",
         formData,
         {
           responseType: "blob",
