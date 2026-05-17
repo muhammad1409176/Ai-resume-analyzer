@@ -6,3 +6,5 @@ scikit-learn
 numpy
 pandas
 reportlab
+PyPDF2
+joblib
