@@ -22,6 +22,8 @@ public class ResumeService {
 
     private static final String UPLOAD_DIR = System.getProperty("user.dir") + "/uploads";
 
+    private static final String AI_SERVICE_URL = "https://ai-resume-analyzer-ai-iues.onrender.com";
+
     @Autowired
     private ResumeRepository resumeRepository;
 
@@ -76,7 +78,9 @@ public class ResumeService {
 
         filePath = filePath.replace("\\", "/");
 
-        String url = "http://localhost:8000/analyze?file_path=" + filePath;
+        String url = AI_SERVICE_URL
+                + "/analyze?file_path="
+                + filePath;
 
         return restTemplate.getForObject(url, Map.class);
     }
@@ -94,7 +98,8 @@ public class ResumeService {
 
         filePath = filePath.replace("\\", "/");
 
-        String url = "http://localhost:8000/match?file_path="
+        String url = AI_SERVICE_URL
+                + "/match?file_path="
                 + filePath
                 + "&job_description="
                 + java.net.URLEncoder.encode(
@@ -139,8 +144,7 @@ public class ResumeService {
 
         if (analysis.get("strengths") != null) {
             for (Object item : (List<?>) analysis.get("strengths")) {
-                document.add(
-                        new Paragraph("- " + item));
+                document.add(new Paragraph("- " + item));
             }
         }
 
@@ -157,8 +161,7 @@ public class ResumeService {
 
         if (missing != null) {
             for (Object item : (List<?>) missing) {
-                document.add(
-                        new Paragraph("- " + item));
+                document.add(new Paragraph("- " + item));
             }
         }
 
@@ -169,8 +172,7 @@ public class ResumeService {
 
         if (analysis.get("suggestions") != null) {
             for (Object item : (List<?>) analysis.get("suggestions")) {
-                document.add(
-                        new Paragraph("- " + item));
+                document.add(new Paragraph("- " + item));
             }
         }
 
