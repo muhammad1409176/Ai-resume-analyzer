@@ -1,9 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-# pyrefly: ignore [missing-import]
 import fitz  # PyMuPDF
-import re
-from collections import Counter
+import os
+import tempfile
 
 app = FastAPI()
 
@@ -25,15 +24,14 @@ def extract_text_from_pdf(file_path):
     text = ""
     for page in doc:
         text += page.get_text()
+    doc.close()
     return text
 
 
 # -----------------------------
-# Resume Analysis Endpoint
+# Analyze text
 # -----------------------------
-@app.get("/analyze")
-def analyze_resume(file_path: str):
-    text = extract_text_from_pdf(file_path)
+def analyze_text(text):
     lower_text = text.lower()
 
     score = 0
@@ -47,6 +45,7 @@ def analyze_resume(file_path: str):
         strengths.append("Includes technical skills section")
     else:
         suggestions.append("Add a dedicated Skills section")
+
     if "experience" in lower_text:
         score += 20
         strengths.append("Includes work experience")
@@ -102,15 +101,13 @@ def analyze_resume(file_path: str):
 
 
 # -----------------------------
-# Job Matching Endpoint
+# Match text with Job Description
 # -----------------------------
-@app.get("/match")
-def match_resume(file_path: str, job_description: str):
-    resume_text = extract_text_from_pdf(file_path).lower()
+def match_text(resume_text, job_description):
+    resume_text = resume_text.lower()
     resume_text = resume_text.replace("rest web services", "rest api")
     job_text = job_description.lower()
 
-    # Extract only technical keywords
     skill_keywords = [
         "java", "python", "react", "spring", "spring boot",
         "javascript", "html", "css", "sql", "mysql",
@@ -132,7 +129,10 @@ def match_resume(file_path: str, job_description: str):
     if total_keywords == 0:
         match_percentage = 0
     else:
-        match_percentage = int((len(matched_keywords) / total_keywords) * 100)
+        match_percentage = int(
+            (len(matched_keywords) / total_keywords) * 100
+        )
+
     recommendations = [
         f"Add experience with {skill}"
         for skill in missing_keywords[:5]
@@ -141,9 +141,12 @@ def match_resume(file_path: str, job_description: str):
     skill_gap_count = len(missing_keywords)
     potential_improvement = min(skill_gap_count * 5, 25)
     priority_skills = missing_keywords[:5]
+
     career_recommendations = []
 
-    if "java" in matched_keywords and ("spring" in matched_keywords or "spring boot" in matched_keywords):
+    if "java" in matched_keywords and (
+        "spring" in matched_keywords or "spring boot" in matched_keywords
+    ):
         career_recommendations.append("Backend Developer")
 
     if "react" in matched_keywords and "javascript" in matched_keywords:
@@ -160,6 +163,7 @@ def match_resume(file_path: str, job_description: str):
 
     if not career_recommendations:
         career_recommendations.append("Software Engineer")
+
     return {
         "match_percentage": match_percentage,
         "matched_keywords": matched_keywords,
@@ -168,5 +172,50 @@ def match_resume(file_path: str, job_description: str):
         "skill_gap_count": skill_gap_count,
         "potential_improvement": potential_improvement,
         "priority_skills": priority_skills,
-      "career_recommendations": career_recommendations
+        "career_recommendations": career_recommendations
     }
+
+
+# -----------------------------
+# Resume Analysis Endpoint
+# -----------------------------
+@app.post("/analyze")
+async def analyze_resume(file: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
+        temp.write(await file.read())
+        temp_path = temp.name
+
+    try:
+        text = extract_text_from_pdf(temp_path)
+        return analyze_text(text)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+# -----------------------------
+# Job Matching Endpoint
+# -----------------------------
+@app.post("/match")
+async def match_resume(
+    file: UploadFile = File(...),
+    job_description: str = Form(...)
+):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
+        temp.write(await file.read())
+        temp_path = temp.name
+
+    try:
+        resume_text = extract_text_from_pdf(temp_path)
+        return match_text(resume_text, job_description)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+# -----------------------------
+# Health Check Endpoint
+# -----------------------------
+@app.get("/")
+def root():
+    return {"message": "AI Resume Analyzer API is running"}
