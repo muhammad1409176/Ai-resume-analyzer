@@ -23,7 +23,6 @@ public class ResumeService {
     private static final String UPLOAD_DIR = System.getProperty("user.dir") + "/uploads";
 
     private static final String AI_SERVICE_URL = "https://ai-resume-analyzer-ai-iues.onrender.com";
-
     @Autowired
     private ResumeRepository resumeRepository;
 
