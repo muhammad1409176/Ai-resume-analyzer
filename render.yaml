@@ -47,6 +47,7 @@ services:
           name: resume-analyzer-backend
           type: web
           property: host
-        sync: false
+        property: host
+
         # Adjust property to include /api suffix in the app config if needed, 
         # but here we use the host and we'll handle the '/api' in config.js or env.
