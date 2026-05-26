@@ -4,8 +4,8 @@
     justify-content: center;
     align-items: center;
     padding: 20px;
-    background: linear-gradient(135deg, #0f172a, #1d4ed8, #0f766e);
-    font-family: 'Segoe UI', sans-serif;
+    background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+    font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .login-card {
@@ -107,24 +107,4 @@
     padding: 12px;
     border-radius: 10px;
     margin-bottom: 16px;
-}
-
-.login-footer {
-    margin-top: 25px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.85) !important;
-    font-size: 13px;
-}
-
-.login-footer p {
-    margin: 4px 0;
-    color: rgba(255, 255, 255, 0.85) !important;
-}
-
-.login-footer code {
-    background: rgba(255, 255, 255, 0.12);
-    padding: 2px 6px;
-    border-radius: 6px;
-    color: #ffffff !important;
 }

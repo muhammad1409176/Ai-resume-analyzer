@@ -1,0 +1,78 @@
+.optimization-container {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 12px;
+    border: 1px border solid rgba(99, 102, 241, 0.2);
+}
+
+.optimization-header h3 {
+    margin: 0;
+    color: #818cf8;
+    font-size: 1.5rem;
+}
+
+.pro-tip {
+    margin: 0.5rem 0 1.5rem 0;
+    font-size: 0.9rem;
+    color: #94a3b8;
+    padding: 0.75rem;
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 4px solid #10b981;
+    border-radius: 4px;
+}
+
+.optimization-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.optimization-card {
+    background: #1e293b;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #334155;
+    transition: transform 0.2s;
+}
+
+.optimization-card:hover {
+    transform: translateY(-2px);
+    border-color: #6366f1;
+}
+
+.opt-badge {
+    background: #6366f1;
+    color: white;
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.opt-content {
+    padding: 1rem;
+}
+
+.opt-before p {
+    color: #94a3b8;
+    font-style: italic;
+    margin: 0.5rem 0;
+}
+
+.opt-arrow {
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #10b981;
+    margin: 1rem 0;
+    letter-spacing: 1px;
+}
+
+.opt-after p {
+    color: #f8fafc;
+    background: rgba(99, 102, 241, 0.1);
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin: 0.5rem 0;
+    line-height: 1.5;
+}

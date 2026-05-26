@@ -1,19 +1,35 @@
 import React, { useState } from "react";
+import axios from "axios";
+import CONFIG from "../config";
 import "./AdminLogin.css";
-function AdminLogin({ onLogin }) {
+
+const API_BASE_URL = CONFIG.API_BASE_URL;
+
+function AdminLogin({ onLogin, sessionExpired, onDismissExpiry }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError("");
+        setLoading(true);
 
-        // Demo credentials
-        if (username === "admin" && password === "admin123") {
-            localStorage.setItem("isAdminLoggedIn", "true");
-            onLogin(); // Notify parent component
-        } else {
-            setError("Invalid username or password");
+        try {
+            const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+                username,
+                password,
+            });
+
+            const { token } = response.data;
+            // P1 FIX: Remove redundant token storage here as it's now handled in App.js handleLogin
+            onLogin(token);
+        } catch (err) {
+            const message = err.response?.data?.error || "Invalid username or password";
+            setError(message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -27,6 +43,13 @@ function AdminLogin({ onLogin }) {
                     Sign in to access analytics, ATS reports, and administrative tools.
                 </p>
 
+                {sessionExpired && (
+                    <div className="session-expired-banner">
+                        <span>⚠️ Your session has expired. Please sign in again.</span>
+                        <button className="dismiss-btn" onClick={onDismissExpiry}>✕</button>
+                    </div>
+                )}
+
                 {error && <div className="login-error">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="login-form">
@@ -38,6 +61,7 @@ function AdminLogin({ onLogin }) {
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             required
+                            disabled={loading}
                         />
                     </div>
 
@@ -49,22 +73,17 @@ function AdminLogin({ onLogin }) {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
+                            disabled={loading}
                         />
                     </div>
 
-                    <button type="submit" className="login-button">
-                        Login to Dashboard
+                    <button type="submit" className="login-button" disabled={loading}>
+                        {loading ? "Signing in..." : "Login to Dashboard"}
                     </button>
                 </form>
-
-                <div className="login-footer">
-                    <p><strong>Demo Credentials</strong></p>
-                    <p>Username: <code>admin</code></p>
-                    <p>Password: <code>admin123</code></p>
-                </div>
             </div>
         </div>
     );
-
 }
+
 export default AdminLogin;

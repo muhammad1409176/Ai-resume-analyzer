@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: resume-db
+    environment:
+      POSTGRES_DB: resumedb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  ai-service:
+    build: ./ai-service
+    container_name: resume-ai-service
+    environment:
+      - AI_SERVICE_KEY=${AI_SERVICE_KEY:-dev-internal-key-change-in-production}
+    ports:
+      - "8000:8000"
+
+  backend:
+    build: ./backend
+    container_name: resume-backend
+    depends_on:
+      - db
+      - ai-service
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/resumedb
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+      - JWT_SECRET=${JWT_SECRET:-resume-analyzer-super-secret-key-change-in-production-2024}
+      - AI_SERVICE_URL=http://ai-service:8000
+      - AI_SERVICE_KEY=${AI_SERVICE_KEY:-dev-internal-key-change-in-production}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: resume-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

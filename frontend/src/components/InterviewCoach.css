@@ -1,0 +1,122 @@
+.coach-container {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+    border-radius: 16px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+.coach-header h3 {
+    margin: 0;
+    color: #a78bfa;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.advice-banner {
+    margin: 1rem 0 2rem 0;
+    padding: 1rem;
+    background: rgba(139, 92, 246, 0.1);
+    border-left: 4px solid #8b5cf6;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.95rem;
+}
+
+.questions-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.question-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.question-card:hover {
+    border-color: #8b5cf6;
+    background: #243147;
+    transform: translateX(5px);
+}
+
+.question-card.active {
+    border-color: #8b5cf6;
+    background: #1e293b;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+}
+
+.q-type-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    background: #8b5cf6;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.q-main h4 {
+    margin: 0 0 0.5rem 0;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.q-text {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1.1rem;
+    line-height: 1.4;
+}
+
+.q-tip {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #334155;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.q-tip strong {
+    color: #10b981;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.q-tip p {
+    color: #94a3b8;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.q-expand-hint {
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

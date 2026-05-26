@@ -15,21 +15,31 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/resumes")
-@CrossOrigin(origins = "*")
 public class ResumeController {
 
     @Autowired
     private ResumeService resumeService;
 
-    @PostMapping("/upload")
-    public String uploadResume(@RequestParam("file") MultipartFile file)
-            throws IOException {
-        return resumeService.uploadResume(file);
+    // ── P1 FIX: Validate file is PDF before processing ───────────────────────
+    private void validatePdfFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("No file provided");
+        }
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || !originalName.toLowerCase().endsWith(".pdf")) {
+            throw new IllegalArgumentException("Only PDF files are accepted");
+        }
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.equals("application/pdf")
+                && !contentType.equals("application/octet-stream")) {
+            throw new IllegalArgumentException("Invalid file type. Only PDF is accepted");
+        }
     }
 
     @PostMapping("/upload-and-analyze")
     public Map<String, Object> uploadAndAnalyze(
             @RequestParam("file") MultipartFile file) throws IOException {
+        validatePdfFile(file);
         return resumeService.uploadAndAnalyze(file);
     }
 
@@ -37,13 +47,21 @@ public class ResumeController {
     public Map<String, Object> matchJob(
             @RequestParam("file") MultipartFile file,
             @RequestParam("jobDescription") String jobDescription) throws IOException {
+        validatePdfFile(file);
+        // Validate job description input
+        if (jobDescription == null || jobDescription.isBlank()) {
+            throw new IllegalArgumentException("Job description cannot be empty.");
+        }
+        if (jobDescription.length() > 5000) {
+            throw new IllegalArgumentException("Job description is too long (max 5000 characters).");
+        }
         return resumeService.matchJob(file, jobDescription);
     }
 
     @PostMapping("/generate-report")
     public ResponseEntity<byte[]> generateReport(
             @RequestParam("file") MultipartFile file) throws Exception {
-
+        validatePdfFile(file);
         byte[] pdfBytes = resumeService.generatePdfReport(file);
 
         HttpHeaders headers = new HttpHeaders();
@@ -54,5 +72,25 @@ public class ResumeController {
                         .build());
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    @PostMapping("/optimize")
+    public Map<String, Object> optimize(@RequestParam("file") MultipartFile file) throws IOException {
+        validatePdfFile(file);
+        return resumeService.optimizeResume(file);
+    }
+
+    @PostMapping("/interview-prep")
+    public Map<String, Object> interviewPrep(@RequestParam("file") MultipartFile file) throws IOException {
+        validatePdfFile(file);
+        return resumeService.generateInterviewQuestions(file);
+    }
+
+    // ── Global exception handler for validation and service errors ───────────
+    @ExceptionHandler({ IllegalArgumentException.class, RuntimeException.class })
+    public ResponseEntity<Map<String, String>> handleErrors(Exception ex) {
+        HttpStatus status = (ex instanceof IllegalArgumentException) ? HttpStatus.BAD_REQUEST
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(status).body(Map.of("error", ex.getMessage()));
     }
 }

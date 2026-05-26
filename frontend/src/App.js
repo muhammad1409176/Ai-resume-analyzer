@@ -1,15 +1,14 @@
-// Full cleaned App.js code
-// Copy and replace everything in frontend/src/App.js
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import "./App.css";
 import AdminLogin from "./components/AdminLogin";
+import OptimizationList from "./components/OptimizationList";
+import InterviewCoach from "./components/InterviewCoach";
+import CONFIG from "./config";
 import {
   BarChart,
   Bar,
   XAxis,
-  YAxis,
   Tooltip,
   ResponsiveContainer,
   PieChart,
@@ -17,9 +16,18 @@ import {
   Cell,
   LineChart,
   Line,
-  CartesianGrid,
   Legend,
 } from "recharts";
+
+const API_BASE_URL = CONFIG.API_BASE_URL;
+
+// ── Auth helpers ─────────────────────────────────────────────────────────────
+const getToken = () => localStorage.getItem("adminToken");
+
+const getAuthHeaders = () => {
+  const token = getToken();
+  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+};
 
 function App() {
   const [file, setFile] = useState(null);
@@ -28,65 +36,106 @@ function App() {
   const [matchResult, setMatchResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [adminStats, setAdminStats] = useState(null);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [optimizationResult, setOptimizationResult] = useState(null);
+  const [optimizing, setOptimizing] = useState(false);
+  const [interviewResult, setInterviewResult] = useState(null);
+  const [loadingCoach, setLoadingCoach] = useState(false);
 
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(
-    localStorage.getItem("isAdminLoggedIn") === "true"
-  );
+  const [scoreDistribution, setScoreDistribution] = useState([
+    { range: "0-20", count: 0 },
+    { range: "21-40", count: 0 },
+    { range: "41-60", count: 0 },
+    { range: "61-80", count: 0 },
+    { range: "81-100", count: 0 },
+  ]);
 
-  // Sample Analytics Data
-  const scoreDistribution = [
-    { range: "0-20", count: 2 },
-    { range: "21-40", count: 5 },
-    { range: "41-60", count: 12 },
-    { range: "61-80", count: 24 },
-    { range: "81-100", count: 31 },
-  ];
+  const [missingSkillsData, setMissingSkillsData] = useState([]);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
 
-  const missingSkillsData = [
-    { name: "AWS", value: 15 },
-    { name: "Spring Boot", value: 12 },
-    { name: "Docker", value: 10 },
-    { name: "Python", value: 8 },
-    { name: "Git", value: 6 },
-  ];
+  const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
-  const roleData = [
-    { role: "Full Stack", count: 20 },
-    { role: "Backend", count: 15 },
-    { role: "Frontend", count: 12 },
-    { role: "DevOps", count: 8 },
-  ];
+  const handleLogout = useCallback((expired = false) => {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("isAdminLoggedIn");
+    setIsAdminLoggedIn(false);
+    setAdminStats(null);
+    if (expired) setSessionExpired(true);
+  }, []);
 
-  const monthlyTrend = [
-    { month: "Jan", resumes: 10 },
-    { month: "Feb", resumes: 15 },
-    { month: "Mar", resumes: 22 },
-    { month: "Apr", resumes: 28 },
-    { month: "May", resumes: 35 },
-    { month: "Jun", resumes: 42 },
-  ];
+  const loadAdminStats = useCallback(async (tokenToUse) => {
+    try {
+      const activeToken = tokenToUse || getToken();
+      if (!activeToken) return;
 
-  const COLORS = [
-    "#2563eb",
-    "#10b981",
-    "#f59e0b",
-    "#8b5cf6",
-    "#ef4444",
-  ];
+      const headers = { headers: { Authorization: `Bearer ${activeToken}` } };
+      const response = await axios.get(`${API_BASE_URL}/admin/stats`, headers);
+      const data = response.data;
+      setAdminStats(data);
+
+      if (data.scoreDistribution) {
+        setScoreDistribution([
+          { range: "0-20", count: data.scoreDistribution[0] },
+          { range: "21-40", count: data.scoreDistribution[1] },
+          { range: "41-60", count: data.scoreDistribution[2] },
+          { range: "61-80", count: data.scoreDistribution[3] },
+          { range: "81-100", count: data.scoreDistribution[4] },
+        ]);
+      }
+
+      if (data.monthlyTrend) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const trend = Object.entries(data.monthlyTrend)
+          .map(([month, count]) => ({ month, resumes: count }))
+          .sort((a, b) => months.indexOf(a.month) - months.indexOf(b.month));
+        setMonthlyTrend(trend);
+      }
+
+      if (data.topMissingSkills) {
+        setMissingSkillsData(data.topMissingSkills);
+      }
+    } catch (error) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        handleLogout(true); // true = session expired, show banner
+      } else {
+        console.error("Failed to load admin stats", error);
+      }
+    }
+  }, [handleLogout]);
+
+  // Validate token on startup
+  useEffect(() => {
+    const validateToken = async () => {
+      const token = getToken();
+      if (!token) {
+        setIsVerifying(false);
+        return;
+      }
+      try {
+        // Use dedicated validation endpoint
+        await axios.post(`${API_BASE_URL}/auth/validate`, {}, getAuthHeaders());
+        setIsAdminLoggedIn(true);
+      } catch (e) {
+        handleLogout();
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+    validateToken();
+  }, [handleLogout]);
 
   useEffect(() => {
     if (isAdminLoggedIn) {
       loadAdminStats();
     }
-  }, [isAdminLoggedIn]);
+  }, [isAdminLoggedIn, loadAdminStats]);
 
-  const loadAdminStats = async () => {
-    try {
-      const response = await axios.get("https://ai-resume-analyzer-backend-z6g8.onrender.com/api/admin/stats");
-      setAdminStats(response.data);
-    } catch (error) {
-      console.error("Failed to load admin stats", error);
-    }
+  const handleLogin = (token) => {
+    localStorage.setItem("adminToken", token);
+    localStorage.setItem("isAdminLoggedIn", "true");
+    setIsAdminLoggedIn(true);
   };
 
   const analyzeResume = async () => {
@@ -101,31 +150,21 @@ function App() {
     try {
       setLoading(true);
       const response = await axios.post(
-        "https://ai-resume-analyzer-backend-z6g8.onrender.com/api/resumes/upload-and-analyze",
+        `${API_BASE_URL}/resumes/upload-and-analyze`,
         formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
       setResult(response.data);
     } catch (error) {
-      console.error(error);
-      alert("Resume analysis failed.");
+      alert(error.response?.data?.error || "Resume analysis failed.");
     } finally {
       setLoading(false);
     }
   };
 
   const matchJobDescription = async () => {
-    if (!file) {
-      alert("Please upload a resume first.");
-      return;
-    }
-
-    if (!jobDescription.trim()) {
-      alert("Please enter a job description.");
+    if (!file || !jobDescription.trim()) {
+      alert("Please upload a resume and enter a job description.");
       return;
     }
 
@@ -136,44 +175,74 @@ function App() {
     try {
       setLoading(true);
       const response = await axios.post(
-        "https://ai-resume-analyzer-backend-z6g8.onrender.com/api/resumes/match-job",
+        `${API_BASE_URL}/resumes/match-job`,
         formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
       setMatchResult(response.data);
     } catch (error) {
-      console.error(error);
-      alert("Job matching failed.");
+      alert(error.response?.data?.error || "Job matching failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadReport = async () => {
+  const handleOptimize = async () => {
     if (!file) {
       alert("Please upload a resume first.");
       return;
     }
-
     const formData = new FormData();
     formData.append("file", file);
 
     try {
+      setOptimizing(true);
       const response = await axios.post(
-        "https://ai-resume-analyzer-backend-z6g8.onrender.com/api/resumes/generate-report",
+        `${API_BASE_URL}/resumes/optimize`,
         formData,
-        {
-          responseType: "blob",
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
+      setOptimizationResult(response.data);
+    } catch (error) {
+      alert("AI optimization failed.");
+    } finally {
+      setOptimizing(false);
+    }
+  };
 
+  const startInterviewPrep = async () => {
+    if (!file) {
+      alert("Please upload a resume first.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      setLoadingCoach(true);
+      const response = await axios.post(
+        `${API_BASE_URL}/resumes/interview-prep`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      setInterviewResult(response.data);
+    } catch (error) {
+      alert("Interview preparation failed.");
+    } finally {
+      setLoadingCoach(false);
+    }
+  };
+
+  const downloadReport = async () => {
+    if (!file) return alert("Please upload a resume first.");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/resumes/generate-report`, formData, {
+        responseType: "blob",
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -182,258 +251,221 @@ function App() {
       link.click();
       link.remove();
     } catch (error) {
-      console.error(error);
       alert("PDF generation failed.");
     }
   };
 
+  if (isVerifying) return <div className="loading-screen">Authenticating...</div>;
+
   if (!isAdminLoggedIn) {
-    return (
-      <AdminLogin
-        onLogin={() => {
-          localStorage.setItem("isAdminLoggedIn", "true");
-          setIsAdminLoggedIn(true);
-        }}
-      />
-    );
+    return <AdminLogin onLogin={handleLogin} sessionExpired={sessionExpired} onDismissExpiry={() => setSessionExpired(false)} />;
   }
 
   return (
     <div className="app-container">
-      <h1>AI Resume Analyzer</h1>
-      <p className="subtitle">
-        Upload your resume and get AI-powered feedback.
-      </p>
+      <header>
+        <h1>AI Resume Analyzer</h1>
+        <p className="subtitle">Advanced analytics and career insights platform.</p>
+      </header>
 
       {adminStats && (
-        <div className="section">
-          <h3>Admin Dashboard</h3>
+        <section className="section dashboard">
+          <div className="dashboard-header">
+            <h3>Admin Overview</h3>
+            <button onClick={handleLogout} className="logout-btn">Sign Out</button>
+          </div>
 
-          <button
-            onClick={() => {
-              localStorage.removeItem("isAdminLoggedIn");
-              setIsAdminLoggedIn(false);
-            }}
-            style={{
-              width: "auto",
-              padding: "10px 20px",
-              marginBottom: "20px",
-              background: "#ef4444",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}
-          >
-            Logout
-          </button>
+          <div className="stats-grid">
+            <div className="stat-item">
+              <span className="stat-value">{adminStats.totalResumes}</span>
+              <span className="stat-label">Total Resumes</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{adminStats.analyzedResumes}</span>
+              <span className="stat-label">Analyzed</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{adminStats.averageScore}</span>
+              <span className="stat-label">Avg ATS Score</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{adminStats.highestScore}</span>
+              <span className="stat-label">Peak Score</span>
+            </div>
+          </div>
 
-          <ul>
-            <li><strong>Total Resumes Analyzed:</strong> {adminStats.totalResumes}</li>
-            <li><strong>Average ATS Score:</strong> {adminStats.averageScore}</li>
-            <li><strong>Highest Score:</strong> {adminStats.highestScore}</li>
-            <li><strong>Top Missing Skill:</strong> {adminStats.topMissingSkill}</li>
-            <li><strong>Top Recommended Role:</strong> {adminStats.topRecommendedRole}</li>
-          </ul>
-        </div>
+          <div className="summary-insights">
+            <div className="stat-item">
+              <span className="stat-label">Top Missing Skill</span>
+              <span className="stat-value skill-highlight">{adminStats.topMissingSkill || "N/A"}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Target Role</span>
+              <span className="stat-value role-highlight">{adminStats.topRecommendedRole || "N/A"}</span>
+            </div>
+          </div>
+        </section>
       )}
 
-      <div className="charts-section">
-        <h2>Analytics Dashboard</h2>
+      <section className="charts-section">
+        <h2>Analytics Insights</h2>
         <div className="charts-grid">
           <div className="chart-card">
             <h3>ATS Score Distribution</h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={scoreDistribution}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="range" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#2563eb" />
+                <XAxis dataKey="range" stroke="#94a3b8" fontSize={12} />
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
+                  itemStyle={{ color: '#818cf8' }}
+                />
+                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="chart-card">
-            <h3>Top Missing Skills</h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <h3>Skill Gap Analysis</h3>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={missingSkillsData} dataKey="value" nameKey="name" outerRadius={100} label>
+                <Pie
+                  data={missingSkillsData}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  innerRadius={60}
+                  paddingAngle={5}
+                >
                   {missingSkillsData.map((entry, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                <Legend iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
           <div className="chart-card">
-            <h3>Recommended Roles</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={roleData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="role" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#10b981" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="chart-card">
-            <h3>Monthly Trend</h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <h3>Monthly Activity</h3>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="resumes" stroke="#8b5cf6" />
+                <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                <Line type="monotone" dataKey="resumes" stroke="#a855f7" strokeWidth={3} dot={{ r: 4, fill: '#a855f7' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
+      </section>
 
-      <input
-        type="file"
-        accept=".pdf"
-        onChange={(e) => setFile(e.target.files[0])}
-      />
+      <section className="section core-tools">
+        <div className="tool-box">
+          <label className="tool-label">Upload Resume (PDF)</label>
+          <input type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} />
 
-      <button className="analyze-btn" onClick={analyzeResume} disabled={loading}>
-        {loading ? "Analyzing..." : "Analyze Resume"}
-      </button>
+          <button className="analyze-btn" onClick={analyzeResume} disabled={loading}>
+            {loading ? "Processing AI Analysis..." : "Analyze Portfolio"}
+          </button>
 
-      <textarea
-        placeholder="Paste the job description here..."
-        value={jobDescription}
-        onChange={(e) => setJobDescription(e.target.value)}
-      />
+          <textarea
+            placeholder="Paste Job Description for matching..."
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+          />
 
-      <button className="match-btn" onClick={matchJobDescription} disabled={loading}>
-        Match with Job Description
-      </button>
-
-      <button className="download-btn" onClick={downloadReport}>
-        Download PDF Report
-      </button>
+          <div className="tool-actions">
+            <button className="match-btn" onClick={matchJobDescription} disabled={loading}>Compare with JD</button>
+            <button className="optimize-btn" onClick={handleOptimize} disabled={loading || optimizing}>
+              {optimizing ? "Generating AI Rewrites..." : "Smart Optimize"}
+            </button>
+            <button className="coach-btn" onClick={startInterviewPrep} disabled={loading || loadingCoach}>
+              {loadingCoach ? "Coaching..." : "AI Interview Prep"}
+            </button>
+            <button className="download-btn" onClick={downloadReport}>Export PDF Insight Report</button>
+          </div>
+        </div>
+      </section>
 
       {result && (
         <div className="result-card">
           <div className="score-box">
-            <h2>{result.score}/100</h2>
-            <p>Resume Score • Word Count: {result.word_count}</p>
+            <div className="score-circle">{result.score}</div>
+            <p className="stat-label">ATS COMPATIBILITY SCORE</p>
+            <p className="word-count-label">Word Count: {result.word_count}</p>
           </div>
 
-          <div className="section">
-            <h3>Strengths</h3>
-            <ul>
-              {result.strengths?.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
+          <div className="analysis-grid">
+            <div className="analysis-col">
+              <h3>Strengths</h3>
+              <ul className="result-list">
+                {result.strengths?.map((item, index) => <li key={index}>{item}</li>)}
+              </ul>
+            </div>
+
+            <div className="analysis-col growth-areas">
+              <h3>Growth Areas</h3>
+              <ul className="result-list">
+                {(result.missing_keywords || result.missingKeywords)?.map((item, index) => <li key={index}>{item}</li>)}
+              </ul>
+            </div>
+          </div>
+
+          <div className="suggestions-box">
+            <h3>Critical Suggestions</h3>
+            <ul className="result-list">
+              {result.suggestions?.map((item, index) => <li key={index}>{item}</li>)}
             </ul>
           </div>
 
-          <div className="section">
-            <h3>Missing Keywords</h3>
-            <ul>
-              {(result.missing_keywords || result.missingKeywords)?.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          </div>
+          <OptimizationList
+            optimizations={optimizationResult?.optimizations}
+            overallTip={optimizationResult?.overall_tip}
+          />
 
-          <div className="section">
-            <h3>Suggestions</h3>
-            <ul>
-              {result.suggestions?.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          </div>
+          <InterviewCoach
+            questions={interviewResult?.questions}
+            overallAdvice={interviewResult?.overall_advice}
+          />
         </div>
       )}
 
       {matchResult && (
         <div className="match-card">
-          <h2>{matchResult.match_percentage}% Match</h2>
+          <div className="match-header">
+            <div className="score-circle highlight">{matchResult.match_percentage}%</div>
+            <p className="stat-label">JOB MATCH ACCURACY</p>
+          </div>
 
-          <h3>Matched Keywords</h3>
-          <ul>
-            {matchResult.matched_keywords?.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
-          </ul>
+          <div className="analysis-grid match-details">
+            <div>
+              <h3>Matched Skills</h3>
+              <ul className="match-list">
+                {matchResult.matched_keywords?.map((item, index) => <li key={index}>{item}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3>Missing Skills</h3>
+              <ul className="match-list missing">
+                {matchResult.missing_keywords?.map((item, index) => <li key={index}>{item}</li>)}
+              </ul>
+            </div>
+          </div>
 
-          <h3>Missing Keywords</h3>
-          <ul>
-            {matchResult.missing_keywords?.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
-          </ul>
-
-          <h3>Recommendations</h3>
-          <ul>
-            {matchResult.recommendations?.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
-          </ul>
-
-          <h3>Skills Gap Analysis</h3>
-          <ul>
-            <li><strong>Missing Skills Count:</strong> {matchResult.skill_gap_count}</li>
-            <li><strong>Potential Improvement:</strong> +{matchResult.potential_improvement}%</li>
-          </ul>
-
-          <h3>Priority Skills to Learn</h3>
-          <ul>
-            {matchResult.priority_skills?.map((skill, index) => (
-              <li key={index}>{skill}</li>
-            ))}
-          </ul>
-
-          <h3>Recommended Career Roles</h3>
-          <ul>
-            {matchResult.career_recommendations?.map((role, index) => (
-              <li
-                key={index}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "10px",
-                }}
-              >
-                <span>{role}</span>
+          <div className="career-recommendations">
+            <h3>Recommended Career Paths</h3>
+            <div className="role-links">
+              {matchResult.career_recommendations?.map((role, index) => (
                 <button
-                  type="button"
-                  onClick={() =>
-                    window.open(
-                      `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(role)}`,
-                      "_blank"
-                    )
-                  }
-                  style={{
-                    width: "auto",
-                    padding: "8px 14px",
-                    marginTop: 0,
-                    fontSize: "0.9rem",
-                    background: "#0A66C2",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                  }}
+                  key={index}
+                  onClick={() => window.open(`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(role)}`, "_blank")}
+                  className="role-link-btn"
                 >
-                  Visit LinkedIn Jobs
+                  {role} • LinkedIn Jobs
                 </button>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
