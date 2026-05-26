@@ -344,14 +344,27 @@ public class ResumeService {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         try {
+            String baseUrl = aiServiceUrl;
+            // Handle Render internal hostnames vs full URLs
+            if (baseUrl != null && !baseUrl.startsWith("http")) {
+                baseUrl = "http://" + baseUrl + ":8000";
+            }
+            String finalUrl = baseUrl + path;
+            System.out.println(">>> ResumeService: Calling AI Service at " + finalUrl);
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                    aiServiceUrl + path,
+                    finalUrl,
                     HttpMethod.POST,
                     requestEntity,
                     new ParameterizedTypeReference<Map<String, Object>>() {
                     });
-            return response.getBody();
+
+            Map<String, Object> aiResponse = response.getBody();
+            System.out.println(
+                    ">>> ResumeService: AI Service response: " + (aiResponse != null ? aiResponse.keySet() : "NULL"));
+            return aiResponse;
         } catch (org.springframework.web.client.ResourceAccessException e) {
+
             throw new RuntimeException("AI Service is currently unavailable. Please try again later.");
         } catch (Exception e) {
             throw new RuntimeException("AI Analysis failed: " + e.getMessage());
