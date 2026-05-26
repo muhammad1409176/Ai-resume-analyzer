@@ -85,12 +85,16 @@ public class ResumeService {
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
+        System.out.println(">>> ResumeService: Starting upload and analyze for " + file.getOriginalFilename());
         Path filePath = uploadPath.resolve(safeFileName);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        System.out.println(">>> ResumeService: File saved at " + filePath);
 
         try {
             byte[] fileBytes = Files.readAllBytes(filePath);
+            System.out.println(">>> ResumeService: Calling callAiService...");
             Map<String, Object> analysis = callAiService("/analyze", safeFileName, fileBytes, null);
+            System.out.println(">>> ResumeService: Analysis result received: " + (analysis != null ? "YES" : "NO"));
 
             // Persist full analysis in DB
             Resume resume = new Resume();
