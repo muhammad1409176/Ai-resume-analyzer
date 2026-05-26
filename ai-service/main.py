@@ -19,7 +19,12 @@ async def verify_api_key(key: str = Security(api_key_header)):
 # CORS — restrict to the React dev server in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.onrender.com",
+        "https://*.firebaseapp.com",
+        "https://*.web.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
