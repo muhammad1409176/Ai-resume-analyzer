@@ -368,11 +368,15 @@ public class ResumeService {
                     ">>> ResumeService: AI Service response: " + (aiResponse != null ? aiResponse.keySet() : "NULL"));
             return aiResponse;
         } catch (org.springframework.web.client.ResourceAccessException e) {
-
+            System.err.println(">>> ResumeService: Connection Error: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("AI Service is currently unavailable. Please try again later.");
         } catch (Exception e) {
+            System.err.println(">>> ResumeService: Unexpected Error: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("AI Analysis failed: " + e.getMessage());
         }
+
     }
 
     // ── Helper for PDFBox line writing ───────────────────────────────────────
