@@ -11,10 +11,8 @@ services:
       - key: PORT
         value: 8080
       - key: AI_SERVICE_URL
-        fromService:
-          name: resume-analyzer-ai-service
-          type: web
-          property: host
+        value: http://resume-analyzer-ai-service:8000
+
       - key: AI_SERVICE_KEY
         value: dev-internal-key-change-in-production
 
