@@ -54,7 +54,6 @@ function App() {
 
   const [missingSkillsData, setMissingSkillsData] = useState([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
@@ -137,29 +136,7 @@ function App() {
     localStorage.setItem("adminToken", token);
     localStorage.setItem("isAdminLoggedIn", "true");
     setIsAdminLoggedIn(true);
-    setShowAdminLogin(false);
   };
-
-  // ── Persistence: Load from localStorage ─────────────────────────────────────
-  useEffect(() => {
-    const savedResult = localStorage.getItem("last_analysis_result");
-    const savedMatch = localStorage.getItem("last_match_result");
-    const savedOpt = localStorage.getItem("last_optimization_result");
-    const savedInterview = localStorage.getItem("last_interview_result");
-
-    if (savedResult) setResult(JSON.parse(savedResult));
-    if (savedMatch) setMatchResult(JSON.parse(savedMatch));
-    if (savedOpt) setOptimizationResult(JSON.parse(savedOpt));
-    if (savedInterview) setInterviewResult(JSON.parse(savedInterview));
-  }, []);
-
-  // ── Persistence: Save to localStorage ───────────────────────────────────────
-  useEffect(() => {
-    if (result) localStorage.setItem("last_analysis_result", JSON.stringify(result));
-    if (matchResult) localStorage.setItem("last_match_result", JSON.stringify(matchResult));
-    if (optimizationResult) localStorage.setItem("last_optimization_result", JSON.stringify(optimizationResult));
-    if (interviewResult) localStorage.setItem("last_interview_result", JSON.stringify(interviewResult));
-  }, [result, matchResult, optimizationResult, interviewResult]);
 
   const analyzeResume = async () => {
     if (!file) {
@@ -280,26 +257,14 @@ function App() {
 
   if (isVerifying) return <div className="loading-screen">Authenticating...</div>;
 
+  if (!isAdminLoggedIn) {
+    return <AdminLogin onLogin={handleLogin} sessionExpired={sessionExpired} onDismissExpiry={() => setSessionExpired(false)} />;
+  }
+
   return (
     <div className="app-container">
-      {showAdminLogin && !isAdminLoggedIn && (
-        <AdminLogin
-          onLogin={handleLogin}
-          sessionExpired={sessionExpired}
-          onDismissExpiry={() => setSessionExpired(false)}
-          onBack={() => setShowAdminLogin(false)}
-        />
-      )}
-
       <header>
-        <div className="header-top">
-          <h1>AI Resume Analyzer</h1>
-          {!isAdminLoggedIn && (
-            <button className="admin-access-btn" onClick={() => setShowAdminLogin(true)}>
-              Admin Portal
-            </button>
-          )}
-        </div>
+        <h1>AI Resume Analyzer</h1>
         <p className="subtitle">Advanced analytics and career insights platform.</p>
       </header>
 
