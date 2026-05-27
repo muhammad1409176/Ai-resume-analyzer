@@ -138,6 +138,27 @@ function App() {
     setIsAdminLoggedIn(true);
   };
 
+  // ── Persistence: Load from localStorage ─────────────────────────────────────
+  useEffect(() => {
+    const savedResult = localStorage.getItem("last_analysis_result");
+    const savedMatch = localStorage.getItem("last_match_result");
+    const savedOpt = localStorage.getItem("last_optimization_result");
+    const savedInterview = localStorage.getItem("last_interview_result");
+
+    if (savedResult) setResult(JSON.parse(savedResult));
+    if (savedMatch) setMatchResult(JSON.parse(savedMatch));
+    if (savedOpt) setOptimizationResult(JSON.parse(savedOpt));
+    if (savedInterview) setInterviewResult(JSON.parse(savedInterview));
+  }, []);
+
+  // ── Persistence: Save to localStorage ───────────────────────────────────────
+  useEffect(() => {
+    if (result) localStorage.setItem("last_analysis_result", JSON.stringify(result));
+    if (matchResult) localStorage.setItem("last_match_result", JSON.stringify(matchResult));
+    if (optimizationResult) localStorage.setItem("last_optimization_result", JSON.stringify(optimizationResult));
+    if (interviewResult) localStorage.setItem("last_interview_result", JSON.stringify(interviewResult));
+  }, [result, matchResult, optimizationResult, interviewResult]);
+
   const analyzeResume = async () => {
     if (!file) {
       alert("Please select a PDF resume.");
@@ -268,96 +289,106 @@ function App() {
         <p className="subtitle">Advanced analytics and career insights platform.</p>
       </header>
 
-      {adminStats && (
-        <section className="section dashboard">
+      {adminStats && adminStats.totalResumes > 0 ? (
+        <>
+          <section className="section dashboard">
+            <div className="dashboard-header">
+              <h3>Admin Overview</h3>
+              <button onClick={handleLogout} className="logout-btn">Sign Out</button>
+            </div>
+
+            <div className="stats-grid">
+              <div className="stat-item">
+                <span className="stat-value">{adminStats.totalResumes}</span>
+                <span className="stat-label">Total Resumes</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{adminStats.analyzedResumes}</span>
+                <span className="stat-label">Analyzed</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{adminStats.averageScore}</span>
+                <span className="stat-label">Avg ATS Score</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{adminStats.highestScore}</span>
+                <span className="stat-label">Peak Score</span>
+              </div>
+            </div>
+
+            <div className="summary-insights">
+              <div className="stat-item">
+                <span className="stat-label">Top Missing Skill</span>
+                <span className="stat-value skill-highlight">{adminStats.topMissingSkill || "N/A"}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Target Role</span>
+                <span className="stat-value role-highlight">{adminStats.topRecommendedRole || "N/A"}</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="charts-section">
+            <h2>Analytics Insights</h2>
+            <div className="charts-grid">
+              <div className="chart-card">
+                <h3>ATS Score Distribution</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={scoreDistribution}>
+                    <XAxis dataKey="range" stroke="#94a3b8" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
+                      itemStyle={{ color: '#818cf8' }}
+                    />
+                    <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="chart-card">
+                <h3>Skill Gap Analysis</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={missingSkillsData}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                      innerRadius={60}
+                      paddingAngle={5}
+                    >
+                      {missingSkillsData.map((entry, index) => (
+                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Legend iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="chart-card">
+                <h3>Monthly Activity</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={monthlyTrend}>
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Line type="monotone" dataKey="resumes" stroke="#a855f7" strokeWidth={3} dot={{ r: 4, fill: '#a855f7' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className="section welcome-box">
           <div className="dashboard-header">
-            <h3>Admin Overview</h3>
+            <h3>Welcome to your AI Dashboard</h3>
             <button onClick={handleLogout} className="logout-btn">Sign Out</button>
           </div>
-
-          <div className="stats-grid">
-            <div className="stat-item">
-              <span className="stat-value">{adminStats.totalResumes}</span>
-              <span className="stat-label">Total Resumes</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">{adminStats.analyzedResumes}</span>
-              <span className="stat-label">Analyzed</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">{adminStats.averageScore}</span>
-              <span className="stat-label">Avg ATS Score</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">{adminStats.highestScore}</span>
-              <span className="stat-label">Peak Score</span>
-            </div>
-          </div>
-
-          <div className="summary-insights">
-            <div className="stat-item">
-              <span className="stat-label">Top Missing Skill</span>
-              <span className="stat-value skill-highlight">{adminStats.topMissingSkill || "N/A"}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Target Role</span>
-              <span className="stat-value role-highlight">{adminStats.topRecommendedRole || "N/A"}</span>
-            </div>
-          </div>
+          <p>Get started by uploading your first resume below. Your career insights and analytics will appear here as soon as you analyze a portfolio.</p>
         </section>
       )}
-
-      <section className="charts-section">
-        <h2>Analytics Insights</h2>
-        <div className="charts-grid">
-          <div className="chart-card">
-            <h3>ATS Score Distribution</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={scoreDistribution}>
-                <XAxis dataKey="range" stroke="#94a3b8" fontSize={12} />
-                <Tooltip
-                  contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
-                  itemStyle={{ color: '#818cf8' }}
-                />
-                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="chart-card">
-            <h3>Skill Gap Analysis</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={missingSkillsData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={80}
-                  innerRadius={60}
-                  paddingAngle={5}
-                >
-                  {missingSkillsData.map((entry, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                <Legend iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="chart-card">
-            <h3>Monthly Activity</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={monthlyTrend}>
-                <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
-                <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                <Line type="monotone" dataKey="resumes" stroke="#a855f7" strokeWidth={3} dot={{ r: 4, fill: '#a855f7' }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </section>
 
       <section className="section core-tools">
         <div className="tool-box">
