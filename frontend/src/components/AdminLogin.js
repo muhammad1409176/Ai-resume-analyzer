@@ -5,7 +5,7 @@ import "./AdminLogin.css";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
-function AdminLogin({ onLogin, sessionExpired, onDismissExpiry }) {
+function AdminLogin({ onLogin, sessionExpired, onDismissExpiry, onBack }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -36,7 +36,10 @@ function AdminLogin({ onLogin, sessionExpired, onDismissExpiry }) {
     return (
         <div className="login-page">
             <div className="login-card">
-                <div className="login-badge">🔐 Secure Admin Portal</div>
+                <div className="login-card-header">
+                    <div className="login-badge">🔐 Secure Admin Portal</div>
+                    {onBack && <button className="login-close-btn" onClick={onBack}>✕</button>}
+                </div>
 
                 <h1 className="login-title">AI Resume Analyzer</h1>
                 <p className="login-subtitle">

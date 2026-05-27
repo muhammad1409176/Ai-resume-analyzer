@@ -20,6 +20,13 @@
     border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+.login-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
 .login-badge {
     display: inline-block;
     padding: 8px 14px;
@@ -28,7 +35,23 @@
     color: #ffffff !important;
     font-size: 13px;
     font-weight: 600;
-    margin-bottom: 18px;
+}
+
+.login-close-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5) !important;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0;
+    width: auto !important;
+    margin: 0 !important;
+    transition: color 0.2s;
+}
+
+.login-close-btn:hover {
+    color: #ffffff !important;
+    transform: none !important;
 }
 
 .login-title {
