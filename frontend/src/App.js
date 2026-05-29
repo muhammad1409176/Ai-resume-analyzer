@@ -138,26 +138,6 @@ function App() {
     setIsAdminLoggedIn(true);
   };
 
-  // ── Persistence: Load from localStorage ─────────────────────────────────────
-  useEffect(() => {
-    const savedResult = localStorage.getItem("last_analysis_result");
-    const savedMatch = localStorage.getItem("last_match_result");
-    const savedOpt = localStorage.getItem("last_optimization_result");
-    const savedInterview = localStorage.getItem("last_interview_result");
-
-    if (savedResult) setResult(JSON.parse(savedResult));
-    if (savedMatch) setMatchResult(JSON.parse(savedMatch));
-    if (savedOpt) setOptimizationResult(JSON.parse(savedOpt));
-    if (savedInterview) setInterviewResult(JSON.parse(savedInterview));
-  }, []);
-
-  // ── Persistence: Save to localStorage ───────────────────────────────────────
-  useEffect(() => {
-    if (result) localStorage.setItem("last_analysis_result", JSON.stringify(result));
-    if (matchResult) localStorage.setItem("last_match_result", JSON.stringify(matchResult));
-    if (optimizationResult) localStorage.setItem("last_optimization_result", JSON.stringify(optimizationResult));
-    if (interviewResult) localStorage.setItem("last_interview_result", JSON.stringify(interviewResult));
-  }, [result, matchResult, optimizationResult, interviewResult]);
 
   const analyzeResume = async () => {
     if (!file) {
