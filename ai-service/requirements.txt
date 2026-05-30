@@ -1,11 +1,7 @@
 fastapi
 uvicorn
 python-multipart
-pdfplumber
-scikit-learn
-numpy
-pandas
-reportlab
-PyPDF2
 PyMuPDF
-joblib
+numpy
+scikit-learn
+spacy

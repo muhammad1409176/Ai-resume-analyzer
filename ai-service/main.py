@@ -1,12 +1,23 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
-# pyrefly: ignore [missing-import]
 import fitz  # PyMuPDF
 import os
+import re
 import tempfile
+import spacy
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = FastAPI()
+
+# ── Load spaCy model ──────────────────────────────────────────────────────────
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    from spacy.cli import download
+    download("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
 
 # ── API Key Authentication ────────────────────────────────────────────────────
 API_KEY = os.environ.get("AI_SERVICE_KEY", "dev-internal-key-change-in-production")
@@ -16,7 +27,7 @@ async def verify_api_key(key: str = Security(api_key_header)):
     if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-# CORS — restrict to the React dev server in production
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -31,27 +42,17 @@ app.add_middleware(
 )
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Validate uploaded file is a real PDF
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Validate PDF ──────────────────────────────────────────────────────────────
 def validate_pdf(file: UploadFile):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
-    
-    # Read the first 1024 bytes to check for %PDF magic number
     header = file.file.read(1024)
-    file.file.seek(0) # Reset file pointer
+    file.file.seek(0)
     if b"%PDF-" not in header:
         raise HTTPException(status_code=400, detail="Invalid PDF file content")
 
-    content_type = file.content_type or ""
-    if content_type and "pdf" not in content_type and content_type != "application/octet-stream":
-        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF is accepted")
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Extract text from PDF using PyMuPDF
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Extract text from PDF ─────────────────────────────────────────────────────
 def extract_text_from_pdf(file_path: str) -> str:
     try:
         doc = fitz.open(file_path)
@@ -64,19 +65,16 @@ def extract_text_from_pdf(file_path: str) -> str:
         raise HTTPException(status_code=422, detail=f"Failed to parse PDF: {str(e)}")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Role-specific keyword categories (improved from single flat list)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Skill taxonomy ────────────────────────────────────────────────────────────
 KEYWORD_CATEGORIES = {
-    "languages": ["java", "python", "javascript", "typescript", "go", "rust", "c++", "kotlin", "swift"],
-    "frontend":  ["react", "angular", "vue", "html", "css", "sass", "redux", "nextjs"],
-    "backend":   ["spring boot", "spring", "fastapi", "django", "node", "express", "rest api"],
-    "databases": ["sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch"],
-    "devops":    ["docker", "kubernetes", "aws", "azure", "gcp", "ci/cd", "git", "github", "jenkins"],
-    "practices": ["agile", "scrum", "tdd", "microservices", "api design"],
+    "languages":  ["java", "python", "javascript", "typescript", "go", "rust", "c++", "kotlin", "swift"],
+    "frontend":   ["react", "angular", "vue", "html", "css", "sass", "redux", "nextjs"],
+    "backend":    ["spring boot", "spring", "fastapi", "django", "node", "express", "rest api"],
+    "databases":  ["sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch"],
+    "devops":     ["docker", "kubernetes", "aws", "azure", "gcp", "ci/cd", "git", "github", "jenkins"],
+    "practices":  ["agile", "scrum", "tdd", "microservices", "api design"],
 }
 
-# Required resume sections
 REQUIRED_SECTIONS = {
     "skills":     ["skills", "technical skills"],
     "experience": ["experience", "work experience", "employment"],
@@ -84,69 +82,118 @@ REQUIRED_SECTIONS = {
     "education":  ["education", "degree", "university", "bachelor", "master"],
 }
 
-# Social/professional links
-PROFILE_LINKS = {
-    "github":   5,
-    "linkedin": 5,
-}
+PROFILE_LINKS = {"github": 5, "linkedin": 5}
+
+# Strong action verbs for resume impact
+ACTION_VERBS = [
+    "achieved", "built", "created", "delivered", "designed", "developed",
+    "drove", "engineered", "established", "grew", "implemented", "improved",
+    "increased", "launched", "led", "managed", "optimized", "reduced",
+    "scaled", "shipped", "spearheaded", "streamlined"
+]
+
+PASSIVE_PHRASES = [
+    "responsible for", "worked on", "helped with", "assisted in",
+    "involved in", "participated in", "supported"
+]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Analyze text — improved multi-category scoring
-# ──────────────────────────────────────────────────────────────────────────────
+# ── NLP Helpers ───────────────────────────────────────────────────────────────
+def count_action_verbs(doc) -> int:
+    """Count strong action verbs in resume using lemmatization."""
+    count = 0
+    for token in doc:
+        if token.lemma_.lower() in ACTION_VERBS and token.pos_ == "VERB":
+            count += 1
+    return count
+
+
+def count_quantified_achievements(text: str) -> int:
+    """Count bullet points that contain numbers/percentages — sign of impact."""
+    pattern = r'\b\d+[\%\+x]?\b|\$[\d,]+[KMB]?'
+    return len(re.findall(pattern, text))
+
+
+def count_passive_phrases(text: str) -> int:
+    lower = text.lower()
+    return sum(1 for phrase in PASSIVE_PHRASES if phrase in lower)
+
+
+# ── Core Analyzer ─────────────────────────────────────────────────────────────
 def analyze_text(text: str) -> dict:
-    import re
-    # Normalize all whitespace (including \xa0, newlines, tabs) to standard spaces
-    normalized_text = re.sub(r'\s+', ' ', text).lower().strip()
-    # Apply specific aliases
-    lower_text = normalized_text.replace("rest web services", "rest api")
+    normalized = re.sub(r'\s+', ' ', text).strip()
+    lower = normalized.lower().replace("rest web services", "rest api")
+
+    # Run spaCy NLP pipeline
+    doc = nlp(normalized[:nlp.max_length])
 
     score = 0
     strengths = []
-    missing_keywords = []
     suggestions = []
 
-    # Section checks (up to 40 pts)
+    # 1. Section Check (40 pts)
     section_found = 0
     for section, keywords in REQUIRED_SECTIONS.items():
-        if any(kw in lower_text for kw in keywords):
+        if any(kw in lower for kw in keywords):
             section_found += 1
             strengths.append(f"Includes {section} section")
         else:
-            suggestions.append(f"Add a {section.capitalize()} section")
-    score += section_found * 10  # max 40
+            suggestions.append(f"Add a dedicated {section.capitalize()} section")
+    score += section_found * 10
 
-    # Profile links (up to 10 pts)
+    # 2. Profile Links (10 pts)
     for link, pts in PROFILE_LINKS.items():
-        if link in lower_text:
+        if link in lower:
             score += pts
         else:
             suggestions.append(f"Add your {link.capitalize()} profile link")
 
-    # Category keyword scan (up to 50 pts)
-    all_found = []
-    all_missing = []
+    # 3. Keyword Coverage (30 pts)
+    all_found, all_missing = [], []
     categories_covered = 0
     for cat, keywords in KEYWORD_CATEGORIES.items():
-        found_in_cat = [kw for kw in keywords if kw in lower_text]
-        missing_in_cat = [kw for kw in keywords if kw not in lower_text]
-        if found_in_cat:
+        found = [kw for kw in keywords if kw in lower]
+        missing = [kw for kw in keywords if kw not in lower]
+        if found:
             categories_covered += 1
-            all_found.extend(found_in_cat)
-        all_missing.extend(missing_in_cat)
+            all_found.extend(found)
+        all_missing.extend(missing)
 
-    # Award up to 50 pts for breadth of categories covered
-    score += min(categories_covered * 9, 50)
-
+    score += min(categories_covered * 5, 30)
     if categories_covered >= 3:
         strengths.append("Strong coverage of multiple technology domains")
     elif categories_covered >= 1:
         strengths.append("Contains relevant technical keywords")
 
-    missing_keywords = all_missing[:10]
-    if missing_keywords:
+    # 4. Impact Score via spaCy (20 pts)
+    action_count = count_action_verbs(doc)
+    quantified = count_quantified_achievements(text)
+    passive_count = count_passive_phrases(text)
+
+    impact_score = min((action_count * 2) + (quantified * 3), 20)
+    impact_score = max(impact_score - (passive_count * 2), 0)
+    score += impact_score
+
+    if action_count >= 5:
+        strengths.append(f"Uses {action_count} strong action verbs — great for ATS")
+    elif action_count >= 2:
+        strengths.append("Some impact-driven language detected")
+
+    if quantified >= 3:
+        strengths.append(f"{quantified} quantified achievements found — impressive!")
+    elif quantified >= 1:
+        strengths.append("Some achievements are quantified with numbers")
+
+    if passive_count > 2:
         suggestions.append(
-            "Consider adding experience with: " + ", ".join(missing_keywords[:5])
+            f"Replace {passive_count} passive phrases ('responsible for', 'worked on') "
+            "with strong action verbs like 'Built', 'Led', 'Engineered'"
+        )
+
+    if quantified < 2:
+        suggestions.append(
+            "Add more quantified achievements (e.g., 'Reduced load time by 40%', "
+            "'Led a team of 5 engineers')"
         )
 
     score = min(score, 100)
@@ -155,195 +202,224 @@ def analyze_text(text: str) -> dict:
         "score": score,
         "word_count": len(text.split()),
         "strengths": strengths,
-        "missing_keywords": missing_keywords,
+        "missing_keywords": all_missing[:10],
         "suggestions": suggestions,
+        # NLP insights
+        "nlp_insights": {
+            "action_verbs_found": action_count,
+            "quantified_achievements": quantified,
+            "passive_phrases": passive_count,
+        }
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Match resume with job description
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Job Matcher ───────────────────────────────────────────────────────────────
 def match_text(resume_text: str, job_description: str) -> dict:
-    import re
-    # Normalize all whitespace (including \xa0, newlines, tabs) to standard spaces
-    resume_lower = re.sub(r'\s+', ' ', resume_text).lower().strip().replace("rest web services", "rest api")
-    job_lower = re.sub(r'\s+', ' ', job_description).lower().strip()
+    # Normalize
+    resume_lower = re.sub(r'\s+', ' ', resume_text).lower().replace("rest web services", "rest api")
+    job_lower = re.sub(r'\s+', ' ', job_description).lower()
 
-    # Flatten all skill keywords for matching
-    all_skills = [kw for keywords in KEYWORD_CATEGORIES.values() for kw in keywords]
-
-    matched_keywords = []
-    missing_keywords = []
-
+    # Hard keyword matching
+    all_skills = [kw for kws in KEYWORD_CATEGORIES.values() for kw in kws]
+    matched, missing = [], []
     for skill in all_skills:
         if skill in job_lower:
-            if skill in resume_lower:
-                matched_keywords.append(skill)
-            else:
-                missing_keywords.append(skill)
+            (matched if skill in resume_lower else missing).append(skill)
 
-    total_keywords = len(matched_keywords) + len(missing_keywords)
-    match_percentage = (
-        int((len(matched_keywords) / total_keywords) * 100)
-        if total_keywords > 0 else 0
-    )
+    total = len(matched) + len(missing)
+    keyword_match_pct = int((len(matched) / total) * 100) if total > 0 else 0
 
-    recommendations = [f"Add experience with {skill}" for skill in missing_keywords[:5]]
-    skill_gap_count = len(missing_keywords)
-    potential_improvement = min(skill_gap_count * 5, 30)
-    priority_skills = missing_keywords[:5]
+    # TF-IDF Semantic similarity
+    try:
+        vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
+        tfidf = vectorizer.fit_transform([resume_lower, job_lower])
+        semantic_score = int(cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0] * 100)
+    except Exception:
+        semantic_score = keyword_match_pct
 
-    # Career path recommendations based on matched skills
+    # Blend: 60% keyword match, 40% semantic similarity
+    match_percentage = int(keyword_match_pct * 0.6 + semantic_score * 0.4)
+
+    # Career path
     career_recommendations = []
-    if "java" in matched_keywords and any(s in matched_keywords for s in ["spring boot", "spring"]):
+    if "java" in matched and any(s in matched for s in ["spring boot", "spring"]):
         career_recommendations.append("Backend Developer")
-    if "react" in matched_keywords and "javascript" in matched_keywords:
+    if "react" in matched and "javascript" in matched:
         career_recommendations.append("Frontend Developer")
-    if any(s in matched_keywords for s in ["spring boot", "spring"]) and "react" in matched_keywords:
+    if any(s in matched for s in ["spring boot", "spring"]) and "react" in matched:
         career_recommendations.append("Full Stack Developer")
-    if "docker" in matched_keywords and any(s in matched_keywords for s in ["aws", "kubernetes", "azure"]):
+    if "docker" in matched and any(s in matched for s in ["aws", "kubernetes", "azure"]):
         career_recommendations.append("DevOps / Cloud Engineer")
-    if "python" in matched_keywords and any(s in matched_keywords for s in ["sql", "mysql", "postgresql"]):
+    if "python" in matched and any(s in matched for s in ["sql", "mysql", "postgresql"]):
         career_recommendations.append("Data Engineer / Analyst")
     if not career_recommendations:
         career_recommendations.append("Software Engineer")
 
     return {
         "match_percentage": match_percentage,
-        "matched_keywords": matched_keywords,
-        "missing_keywords": missing_keywords,
-        "recommendations": recommendations,
-        "skill_gap_count": skill_gap_count,
-        "potential_improvement": potential_improvement,
-        "priority_skills": priority_skills,
+        "keyword_match_pct": keyword_match_pct,
+        "semantic_similarity": semantic_score,
+        "matched_keywords": matched,
+        "missing_keywords": missing,
         "career_recommendations": career_recommendations,
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Optimize resume content — smart rewrites
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Optimizer ─────────────────────────────────────────────────────────────────
 def suggest_optimizations(text: str) -> dict:
-    import re
-    lower_text = text.lower()
+    lower = text.lower()
     words = text.split()
-    
-    optimizations = []
-    
-    # Extract found skills to make suggestions personal
-    found_skills = []
-    for keywords in KEYWORD_CATEGORIES.values():
-        found_skills.extend([kw for kw in keywords if kw in lower_text])
-    
-    top_skills = list(dict.fromkeys(found_skills))[:3] # Unique top 3
-    if not top_skills: top_skills = ["Software Engineering", "System Design"]
+    doc = nlp(text[:nlp.max_length])
 
-    # 1. Professional Summary Context-Aware
-    summary_trigger = False
-    # If no clear "Summary" or "Profile" section, or if too short
-    if not any(kw in lower_text for kw in ["summary", "profile", "objective"]):
-        summary_trigger = True
+    found_skills = [kw for kws in KEYWORD_CATEGORIES.values() for kw in kws if kw in lower]
+    top_skills = list(dict.fromkeys(found_skills))[:3] or ["Software Engineering", "System Design"]
+
+    optimizations = []
+
+    # 1. Professional Summary
+    if not any(kw in lower for kw in ["summary", "profile", "objective"]):
         current_val = "Missing a dedicated Professional Summary section."
     elif len(words) < 300:
-        summary_trigger = True
         current_val = "Professional summary is too brief to show impact."
-        
-    if summary_trigger:
+    else:
+        current_val = None
+
+    if current_val:
         optimizations.append({
             "category": "Professional Summary",
             "current": current_val,
-            "suggestion": f"Accomplished professional with a core focus on {', '.join(top_skills)}. " + 
-                          "Expertise in developing scalable applications and driving technical excellence through modern design patterns."
+            "suggestion": (
+                f"Accomplished {top_skills[0]} developer with expertise in "
+                f"{', '.join(top_skills)}. Delivered scalable, production-grade "
+                "solutions and led cross-functional teams to achieve measurable business impact."
+            )
         })
 
-    # 2. Work Experience - Impact vs Responsibility
-    impact_keywords = ["achieved", "improved", "increased", "decreased", "reduced", "led", "managed"]
-    impact_score = sum(1 for kw in impact_keywords if kw in lower_text)
-    
-    if "responsible for" in lower_text or impact_score < 3:
+    # 2. Impact Language (using spaCy)
+    action_count = count_action_verbs(doc)
+    passive_count = count_passive_phrases(text)
+    quantified = count_quantified_achievements(text)
+
+    if passive_count > 1 or action_count < 5:
         optimizations.append({
             "category": "Experience Impact",
-            "current": "Experience section uses passive 'duty-based' language.",
-            "suggestion": f"Quantify your achievements using the Google X-Y-Z formula: 'Accomplished [X] as measured by [Y], by doing [Z]'. " + 
-                          f"For example: 'Optimized {top_skills[0] if top_skills else 'codebase'} performance by 25% through efficient resource management.'"
+            "current": f"Found {passive_count} passive phrases and only {action_count} strong action verbs.",
+            "suggestion": (
+                f"Replace passive language with strong verbs. Example: "
+                f"'Responsible for {top_skills[0]} backend' → "
+                f"'Engineered {top_skills[0]} microservices, reducing latency by 35%'"
+            )
         })
 
-    # 3. Technical Skills Breadth
-    found_categories = []
-    for cat, keywords in KEYWORD_CATEGORIES.items():
-        if any(kw in lower_text for kw in keywords):
-            found_categories.append(cat)
-    
-    if len(set(found_categories)) < 3:
-        missing_cats = [c for c in KEYWORD_CATEGORIES.keys() if c not in found_categories]
+    if quantified < 3:
+        optimizations.append({
+            "category": "Quantified Achievements",
+            "current": f"Only {quantified} data-driven achievements detected.",
+            "suggestion": (
+                "Add metrics to every experience bullet. Use the Google X-Y-Z formula: "
+                "'Accomplished [X] as measured by [Y], by doing [Z]'. "
+                "Example: 'Improved API response time by 40% through Redis caching'"
+            )
+        })
+
+    # 3. Skill Breadth
+    found_cats = [cat for cat, kws in KEYWORD_CATEGORIES.items() if any(kw in lower for kw in kws)]
+    if len(found_cats) < 3:
+        missing_cats = [c for c in KEYWORD_CATEGORIES if c not in found_cats]
         optimizations.append({
             "category": "Skill Breadth",
-            "current": f"Resume is heavily focused on {', '.join(found_categories) if found_categories else 'a few areas'}.",
-            "suggestion": f"Broaden your technical profile by highlighting experience in {missing_cats[0] if missing_cats else 'DevOps or Cloud'} technologies " + 
-                          "to appear as a more well-rounded candidate."
+            "current": f"Strong in: {', '.join(found_cats) or 'limited areas'}.",
+            "suggestion": (
+                f"Expand profile by adding {missing_cats[0] if missing_cats else 'DevOps'} skills. "
+                "Employers value T-shaped professionals: deep in one area, broad in others."
+            )
         })
 
     return {
         "optimizations": optimizations,
-        "overall_tip": "Employers look for 'Impact' over 'Duties'. Ensure every bullet point starts with a strong action verb."
+        "overall_tip": (
+            "Employers scan resumes in 6 seconds. Lead every bullet with a strong action verb "
+            "and a measurable outcome. Your top skills should appear in the first 3 lines."
+        )
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Interview Prep — personalized questions
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Interview Prep ────────────────────────────────────────────────────────────
 def generate_interview_questions(text: str) -> dict:
-    lower_text = text.lower()
-    
-    # Identify key tech stack to tailor questions
+    lower = text.lower()
+    doc = nlp(text[:nlp.max_length])
+
+    # Extract actual entities from resume using spaCy NER
+    orgs = list(dict.fromkeys([
+        ent.text for ent in doc.ents if ent.label_ in ("ORG", "PRODUCT")
+        and len(ent.text) > 2
+    ]))[:3]
+
     found_tech = []
-    for cat in ['languages', 'frontend', 'backend', 'databases']:
-        found_tech.extend([kw for kw in KEYWORD_CATEGORIES.get(cat, []) if kw in lower_text])
-    
+    for cat in ["languages", "frontend", "backend", "databases"]:
+        found_tech.extend([kw for kw in KEYWORD_CATEGORIES.get(cat, []) if kw in lower])
+
     tech_context = found_tech[0] if found_tech else "Software Engineering"
-    
+    company_context = orgs[0] if orgs else "your previous role"
+
     questions = [
         {
             "id": 1,
             "type": "Behavioral",
-            "question": f"Can you describe a challenging project where you used {tech_context} and how you overcame technical hurdles?",
-            "tip": "Focus on the STAR method (Situation, Task, Action, Result)."
+            "question": (
+                f"At {company_context}, tell us about a time you faced a major technical challenge "
+                f"while working with {tech_context}. How did you resolve it and what was the impact?"
+            ),
+            "tip": "Use the STAR method (Situation, Task, Action, Result). Quantify the outcome."
         },
         {
             "id": 2,
-            "type": "Technical",
-            "question": f"What are the core design patterns you follow when building scalable applications with {tech_context}?",
-            "tip": "Mention microservices, Clean Architecture, or specific patterns like Singleton/Factory."
+            "type": "Technical Deep-Dive",
+            "question": (
+                f"Walk us through the architecture of a complex system you built using {tech_context}. "
+                "What trade-offs did you make and why?"
+            ),
+            "tip": "Mention design patterns, scalability decisions, and specific technologies used."
         },
         {
             "id": 3,
             "type": "Problem Solving",
-            "question": "Imagine our system is experiencing high latency under load. How would you diagnose and optimize it?",
-            "tip": "Talk about profiling, indexing, caching, and horizontal scaling."
+            "question": (
+                "Our production system just experienced a P0 outage. Walk us through your "
+                "incident response process, from detection to resolution."
+            ),
+            "tip": "Cover monitoring, root cause analysis, rollback strategies, and post-mortems."
         },
         {
             "id": 4,
-            "type": "Soft Skills",
-            "question": "How do you handle disagreements within a technical team regarding architectural decisions?",
-            "tip": "Emphasize collaboration, data-driven decisions, and the 'Disagree and Commit' principle."
+            "type": "Leadership & Collaboration",
+            "question": (
+                "Describe a time when you disagreed with a technical decision made by your team lead. "
+                "How did you handle it?"
+            ),
+            "tip": "Show empathy, data-driven thinking, and the 'Disagree and Commit' principle."
         },
         {
             "id": 5,
-            "type": "Future Focus",
-            "question": f"Where do you see the future of {tech_context} heading, and how are you staying ahead of the curve?",
-            "tip": "Mention recent updates (e.g., Java 21 features, React 19) and your learning process."
+            "type": "Growth Mindset",
+            "question": (
+                f"The {tech_context} ecosystem is evolving rapidly. "
+                "What recent development excites you most, and how are you applying it?"
+            ),
+            "tip": "Mention specific versions, features, or industry trends you're following."
         }
     ]
-    
+
     return {
         "questions": questions,
-        "overall_advice": "Research the company's tech stack and prepare specific examples of your impact."
+        "overall_advice": (
+            "Research the company's engineering blog and tech stack before the interview. "
+            "Prepare a concise 'hero story' for each major project on your resume."
+        )
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Endpoints
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.post("/analyze", dependencies=[Security(verify_api_key)])
 async def analyze_resume(file: UploadFile = File(...)):
     validate_pdf(file)
@@ -359,10 +435,7 @@ async def analyze_resume(file: UploadFile = File(...)):
 
 
 @app.post("/match", dependencies=[Security(verify_api_key)])
-async def match_resume(
-    file: UploadFile = File(...),
-    job_description: str = Form(...),
-):
+async def match_resume(file: UploadFile = File(...), job_description: str = Form(...)):
     validate_pdf(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
         temp.write(await file.read())
@@ -405,4 +478,4 @@ async def interview_prep(file: UploadFile = File(...)):
 
 @app.get("/")
 def root():
-    return {"message": "AI Resume Analyzer API is running"}
+    return {"message": "CareerIQ AI Service — Powered by spaCy NLP"}
