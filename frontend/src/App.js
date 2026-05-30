@@ -43,6 +43,7 @@ function App() {
   const [optimizing, setOptimizing] = useState(false);
   const [interviewResult, setInterviewResult] = useState(null);
   const [loadingCoach, setLoadingCoach] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(false);
 
   const [scoreDistribution, setScoreDistribution] = useState([
     { range: "0-20", count: 0 },
@@ -125,6 +126,19 @@ function App() {
     };
     validateToken();
   }, [handleLogout]);
+
+  // ── Pre-warm: Trigger server wake-up ──────────────────────────────────────
+  useEffect(() => {
+    const wakeTimer = setTimeout(() => setIsWakingUp(true), 5000);
+
+    // Send a lightweight ping to the public validate endpoint
+    axios.post(`${API_BASE_URL}/auth/validate`, {}, { timeout: 60000 })
+      .catch(() => { }) // Ignore errors, we just want to trigger the spin-up
+      .finally(() => {
+        clearTimeout(wakeTimer);
+        setIsWakingUp(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (isAdminLoggedIn) {
@@ -256,7 +270,15 @@ function App() {
     }
   };
 
-  if (isVerifying) return <div className="loading-screen">Authenticating...</div>;
+  if (isVerifying) {
+    return (
+      <div className="loading-screen">
+        <div className="loader"></div>
+        <h2>{isWakingUp ? "Waking up server..." : "Authenticating..."}</h2>
+        {isWakingUp && <p className="loading-hint">This takes about 45s on the first visit because of Render's free tier sleep mode. Hang tight!</p>}
+      </div>
+    );
+  }
 
   if (!isAdminLoggedIn) {
     return <AdminLogin onLogin={handleLogin} sessionExpired={sessionExpired} onDismissExpiry={() => setSessionExpired(false)} />;

@@ -10,26 +10,31 @@ function AdminLogin({ onLogin, sessionExpired, onDismissExpiry }) {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isWakingUp, setIsWakingUp] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setLoading(true);
+        setIsWakingUp(false);
+
+        const wakeTimer = setTimeout(() => setIsWakingUp(true), 5000);
 
         try {
             const response = await axios.post(`${API_BASE_URL}/auth/login`, {
                 username,
                 password,
-            });
+            }, { timeout: 60000 });
 
             const { token } = response.data;
-            // P1 FIX: Remove redundant token storage here as it's now handled in App.js handleLogin
             onLogin(token);
         } catch (err) {
             const message = err.response?.data?.error || "Invalid username or password";
             setError(message);
         } finally {
             setLoading(false);
+            setIsWakingUp(false);
+            clearTimeout(wakeTimer);
         }
     };
 
@@ -78,8 +83,13 @@ function AdminLogin({ onLogin, sessionExpired, onDismissExpiry }) {
                     </div>
 
                     <button type="submit" className="login-button" disabled={loading}>
-                        {loading ? "Signing in..." : "Login to Dashboard"}
+                        {loading ? (isWakingUp ? "Waking up server..." : "Signing in...") : "Login to Dashboard"}
                     </button>
+                    {isWakingUp && (
+                        <p className="login-hint">
+                            The server was sleeping. This take ~45s to wake up on the first try!
+                        </p>
+                    )}
                 </form>
             </div>
         </div>
