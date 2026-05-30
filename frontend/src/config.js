@@ -12,6 +12,7 @@ const getApiBaseUrl = () => {
 
 const CONFIG = {
     API_BASE_URL: getApiBaseUrl(),
+    AI_SERVICE_URL: process.env.REACT_APP_AI_SERVICE_URL || 'https://resume-analyzer-ai-service.onrender.com',
 };
 
 export default CONFIG;

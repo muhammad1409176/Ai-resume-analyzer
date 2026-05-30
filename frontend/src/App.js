@@ -131,13 +131,15 @@ function App() {
   useEffect(() => {
     const wakeTimer = setTimeout(() => setIsWakingUp(true), 5000);
 
-    // Send a lightweight ping to the public validate endpoint
-    axios.post(`${API_BASE_URL}/auth/validate`, {}, { timeout: 60000 })
-      .catch(() => { }) // Ignore errors, we just want to trigger the spin-up
-      .finally(() => {
-        clearTimeout(wakeTimer);
-        setIsWakingUp(false);
-      });
+    // Ping backend
+    const p1 = axios.post(`${API_BASE_URL}/auth/validate`, {}, { timeout: 60000 });
+    // Ping AI service
+    const p2 = axios.get(CONFIG.AI_SERVICE_URL, { timeout: 60000 });
+
+    Promise.allSettled([p1, p2]).finally(() => {
+      clearTimeout(wakeTimer);
+      setIsWakingUp(false);
+    });
   }, []);
 
   useEffect(() => {
