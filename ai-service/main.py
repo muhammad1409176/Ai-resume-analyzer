@@ -70,9 +70,12 @@ SKILL_VARIANTS = {
     "aws": ["amazon web services"],
     "gcp": ["google cloud platform", "google cloud"],
     "ci/cd": ["cicd", "continuous integration", "continuous deployment"],
-    "mysql": ["my sql"],
+    "mysql": ["my sql", "mysql database", "mariadb"],
     "postgresql": ["postgres", "postgre sql"],
     "mongodb": ["mongo db", "mongo"],
+    "html": ["html5"],
+    "css": ["css3", "sass", "scss"],
+    "communication": ["verbal communication", "written communication", "presentation skills"],
 }
 
 ACTION_VERBS = [

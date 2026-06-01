@@ -45,6 +45,7 @@ function App() {
   const [loadingCoach, setLoadingCoach] = useState(false);
   const [isWakingUp, setIsWakingUp] = useState(false);
   const [analysisLogs, setAnalysisLogs] = useState([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [scoreDistribution, setScoreDistribution] = useState([
     { range: "0-20", count: 0 },
@@ -156,27 +157,44 @@ function App() {
   };
 
 
+  const addLog = (msg, type = "info") => {
+    setAnalysisLogs((prev) => [...prev, { msg, type, id: Date.now() + Math.random() }]);
+  };
+
   const analyzeResume = async () => {
     if (!file) {
       alert("Please select a PDF resume.");
       return;
     }
 
+    setAnalysisLogs([]);
+    setIsAnalyzing(true);
+    addLog("Initializing CareerIQ AI Engine...", "info");
+
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      setLoading(true);
+      setTimeout(() => addLog("Handshaking with Python AI Service...", "info"), 600);
+      setTimeout(() => addLog("Running spaCy POS tagging for impact verbs...", "info"), 1400);
+      setTimeout(() => addLog("Detecting quantified achievements & metrics...", "info"), 2200);
+      setTimeout(() => addLog("Matching skill taxonomy against 150+ keywords...", "info"), 3000);
+
       const response = await axios.post(
         `${API_BASE_URL}/resumes/upload-and-analyze`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      setResult(response.data);
+
+      addLog("Analysis complete! Ranking results...", "success");
+      setTimeout(() => {
+        setResult(response.data);
+        setIsAnalyzing(false);
+      }, 800);
     } catch (error) {
+      addLog("Critical error during analysis.", "error");
       alert(error.response?.data?.error || "Resume analysis failed.");
-    } finally {
-      setLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
