@@ -205,22 +205,33 @@ function App() {
       return;
     }
 
+    setAnalysisLogs([]);
+    setIsAnalyzing(true);
+    addLog("Initializing Job Match Engine...", "info");
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("jobDescription", jobDescription);
 
     try {
-      setLoading(true);
+      setTimeout(() => addLog("Analyzing Job Description semantic requirements...", "info"), 500);
+      setTimeout(() => addLog("Comparing resume features against JD criteria...", "info"), 1500);
+
       const response = await axios.post(
         `${API_BASE_URL}/resumes/match-job`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      setMatchResult(response.data);
+
+      addLog("Job Match complete!", "success");
+      setTimeout(() => {
+        setMatchResult(response.data);
+        setIsAnalyzing(false);
+      }, 800);
     } catch (error) {
+      addLog("Job matching failed.", "error");
       alert(error.response?.data?.error || "Job matching failed.");
-    } finally {
-      setLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
@@ -229,21 +240,33 @@ function App() {
       alert("Please upload a resume first.");
       return;
     }
+
+    setAnalysisLogs([]);
+    setIsAnalyzing(true);
+    addLog("Initializing Smart Optimizer...", "info");
+
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      setOptimizing(true);
+      setTimeout(() => addLog("Scanning for structural improvements...", "info"), 600);
+      setTimeout(() => addLog("Generating metric-based bullet point rewrites...", "info"), 1400);
+
       const response = await axios.post(
         `${API_BASE_URL}/resumes/optimize`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      setOptimizationResult(response.data);
+
+      addLog("Optimization scripts generated!", "success");
+      setTimeout(() => {
+        setOptimizationResult(response.data);
+        setIsAnalyzing(false);
+      }, 800);
     } catch (error) {
+      addLog("Optimizer failed.", "error");
       alert("AI optimization failed.");
-    } finally {
-      setOptimizing(false);
+      setIsAnalyzing(false);
     }
   };
 
@@ -252,21 +275,34 @@ function App() {
       alert("Please upload a resume first.");
       return;
     }
+
+    setAnalysisLogs([]);
+    setIsAnalyzing(true);
+    addLog("Summoning AI Interview Coach...", "info");
+
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      setLoadingCoach(true);
+      setTimeout(() => addLog("Extracting candidate technical persona...", "info"), 700);
+      setTimeout(() => addLog("Generating tailored technical questions...", "info"), 1600);
+      setTimeout(() => addLog("Consulting behavioral interview standards...", "info"), 2500);
+
       const response = await axios.post(
         `${API_BASE_URL}/resumes/interview-prep`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      setInterviewResult(response.data);
+
+      addLog("Coach is ready!", "success");
+      setTimeout(() => {
+        setInterviewResult(response.data);
+        setIsAnalyzing(false);
+      }, 1000);
     } catch (error) {
+      addLog("Coach failed.", "error");
       alert("Interview preparation failed.");
-    } finally {
-      setLoadingCoach(false);
+      setIsAnalyzing(false);
     }
   };
 
