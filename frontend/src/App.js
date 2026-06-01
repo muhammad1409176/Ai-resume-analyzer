@@ -158,7 +158,8 @@ function App() {
 
 
   const addLog = (msg, type = "info") => {
-    setAnalysisLogs((prev) => [...prev, { msg, type, id: Date.now() + Math.random() }]);
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setAnalysisLogs((prev) => [...prev, { msg, type, time, id: Date.now() + Math.random() }]);
   };
 
   const analyzeResume = async () => {
@@ -312,7 +313,7 @@ function App() {
         <p className="subtitle">Advanced analytics and career insights platform.</p>
       </header>
 
-      {loading && (
+      {isAnalyzing && (
         <div className="analysis-overlay">
           <div className="analysis-terminal">
             <div className="terminal-header">
@@ -440,8 +441,8 @@ function App() {
           <label className="tool-label">Upload Resume (PDF)</label>
           <input type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} />
 
-          <button className="analyze-btn" onClick={analyzeResume} disabled={loading}>
-            {loading ? "Processing AI Analysis..." : "Analyze Portfolio"}
+          <button className="analyze-btn" onClick={analyzeResume} disabled={isAnalyzing}>
+            {isAnalyzing ? "Processing AI Analysis..." : "Analyze Portfolio"}
           </button>
 
           <textarea
