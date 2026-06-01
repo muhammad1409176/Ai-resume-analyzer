@@ -265,7 +265,22 @@ async def endpoint_interview(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
         temp.write(await file.read()); temp_path = temp.name
     try:
-        return {"questions": [{"q": "Explain your experience with C++ development.", "a": ""}], "overall_advice": "Focus on your leadership of teams of 10-12 people."}
+        text = extract_text_from_pdf(temp_path)
+        analysis = analyze_text(text)
+        persona = analysis["nlp_insights"].get("persona", {})
+        
+        questions = []
+        if persona.get("languages"):
+            questions.append({"q": "Can you walk me through a complex bug you solved in your primary programming language?", "a": ""})
+        if persona.get("backend"):
+            questions.append({"q": "How do you handle API scalability and database optimization in a high-traffic system?", "a": ""})
+        if not questions:
+            questions = [{"q": "Tell me about your most challenging project and what you would do differently today.", "a": ""}]
+            
+        return {
+            "questions": questions[:3],
+            "overall_advice": "Focus on your leadership and team collaboration skills during the behavioral round."
+        }
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
@@ -275,7 +290,24 @@ async def endpoint_optimize(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
         temp.write(await file.read()); temp_path = temp.name
     try:
-        return {"optimizations": [{"category": "Impact", "suggestion": "Use more specific numbers for cost savings"}]}
+        text = extract_text_from_pdf(temp_path)
+        analysis = analyze_text(text)
+        opts = []
+        
+        if analysis["score"] < 75:
+            opts.append({"category": "Structure", "suggestion": "Your core sections are compressed. Use a standard single-column layout for better ATS parsing."})
+        if analysis["nlp_insights"].get("quantified", 0) < 5:
+            opts.append({"category": "Impact", "suggestion": "Add more metrics. E.g. 'Reduced latency by 20%' or 'Managed 12+ developers'."})
+        if not any(url in text.lower() for url in ["github.com", "linkedin.com"]):
+            opts.append({"category": "Metadata", "suggestion": "Missing clickable links. Add your GitHub and LinkedIn profiles to the header."})
+        
+        if not opts:
+            opts = [{"category": "Precision", "suggestion": "Your resume is excellent. Consider customizing keywords for each specific job application."}]
+
+        return {
+            "optimizations": opts[:3],
+            "overall_tip": "High-impact profile detected. Focus on architectural decisions in interviews." if analysis["score"] > 85 else "Standardize your section headers for 100% ATS compatibility."
+        }
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
