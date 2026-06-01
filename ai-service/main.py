@@ -79,10 +79,25 @@ KEYWORD_CATEGORIES = {
 }
 
 REQUIRED_SECTIONS = {
-    "skills":     ["skills", "technical skills"],
-    "experience": ["experience", "work experience", "employment"],
-    "projects":   ["project", "projects", "personal projects"],
-    "education":  ["education", "degree", "university", "bachelor", "master"],
+    "skills":     ["skills", "technical skills", "tech stack", "competencies", "strengths"],
+    "experience": ["experience", "work experience", "employment", "professional background", "work history", "career history", "professional experience"],
+    "projects":   ["project", "projects", "personal projects", "academic projects", "key projects"],
+    "education":  ["education", "degree", "university", "bachelor", "master", "academic background", "qualifications"],
+}
+
+# Common variations of skill names for robust matching
+SKILL_VARIANTS = {
+    "spring boot": ["springboot", "spring-boot", "spring framework"],
+    "react": ["reactjs", "react.js", "react native"],
+    "rest api": ["restful api", "rest apis", "restful apis", "rest web services", "rest api's"],
+    "javascript": ["js", "ecmascript"],
+    "typescript": ["ts"],
+    "aws": ["amazon web services"],
+    "gcp": ["google cloud platform", "google cloud"],
+    "ci/cd": ["cicd", "continuous integration", "continuous deployment"],
+    "mysql": ["my sql"],
+    "postgresql": ["postgres", "postgre sql"],
+    "mongodb": ["mongo db", "mongo"],
 }
 
 PROFILE_LINKS = {"github": 5, "linkedin": 5}
@@ -155,11 +170,11 @@ def analyze_text(text: str) -> dict:
     all_found, all_missing = [], []
     categories_covered = 0
     for cat, keywords in KEYWORD_CATEGORIES.items():
-        found = [kw for kw in keywords if kw in lower]
+        found = [kw for kw in keywords if contains_skill(lower, kw)]
         if found:
             categories_covered += 1
             all_found.extend(found)
-        all_missing.extend([kw for kw in keywords if kw not in lower])
+        all_missing.extend([kw for kw in keywords if not contains_skill(lower, kw)])
 
     score += min(len(set(all_found)) * 1.5, 40) # Real industry breadth
     if categories_covered >= 4:
