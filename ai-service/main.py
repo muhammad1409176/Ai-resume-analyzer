@@ -67,12 +67,15 @@ def extract_text_from_pdf(file_path: str) -> str:
 
 # ── Skill taxonomy ────────────────────────────────────────────────────────────
 KEYWORD_CATEGORIES = {
-    "languages":  ["java", "python", "javascript", "typescript", "go", "rust", "c++", "kotlin", "swift"],
-    "frontend":   ["react", "angular", "vue", "html", "css", "sass", "redux", "nextjs"],
-    "backend":    ["spring boot", "spring", "fastapi", "django", "node", "express", "rest api"],
-    "databases":  ["sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch"],
-    "devops":     ["docker", "kubernetes", "aws", "azure", "gcp", "ci/cd", "git", "github", "jenkins"],
-    "practices":  ["agile", "scrum", "tdd", "microservices", "api design"],
+    "languages":  ["java", "python", "javascript", "typescript", "go", "rust", "c++", "c#", "kotlin", "swift", "php", "ruby", "perl", "r", "dart"],
+    "frontend":   ["react", "angular", "vue", "html", "css", "sass", "redux", "nextjs", "tailwind", "bootstrap", "jquery", "svelte", "webpack", "babel", "vite"],
+    "backend":    ["spring boot", "spring", "fastapi", "django", "node", "express", "rest api", "graphql", "flask", "asp.net", "laravel", "microservices", "grpc", "soap"],
+    "databases":  ["sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch", "cassandra", "dynamodb", "oracle", "sqlite", "mariadb", "firebase"],
+    "cloud_devops":["aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "terraform", "ansible", "ci/cd", "github actions", "gitlab ci", "circleci", "nginx", "helm", "prometheous", "grafana"],
+    "mobile":     ["react native", "flutter", "ios", "android", "swiftui", "objective-c"],
+    "data_ai":    ["machine learning", "deep learning", "ai", "nlp", "tensorflow", "pytorch", "pandas", "numpy", "matplotlib", "scikit-learn", "opencv", "computer vision", "llm", "genai", "prompt engineering"],
+    "testing":    ["jest", "cypress", "selenium", "junit", "mocha", "chai", "playwright", "unit testing", "integration testing"],
+    "soft_skills": ["leadership", "collaboration", "agile", "scrum", "project management", "problem solving", "communication", "teamwork", "critical thinking", "mentoring"]
 }
 
 REQUIRED_SECTIONS = {
@@ -131,7 +134,7 @@ def analyze_text(text: str) -> dict:
     strengths = []
     suggestions = []
 
-    # 1. Section Check (40 pts)
+    # 1. Section Check (30 pts)
     section_found = 0
     for section, keywords in REQUIRED_SECTIONS.items():
         if any(kw in lower for kw in keywords):
@@ -139,7 +142,7 @@ def analyze_text(text: str) -> dict:
             strengths.append(f"Includes {section} section")
         else:
             suggestions.append(f"Add a dedicated {section.capitalize()} section")
-    score += section_found * 10
+    score += section_found * 7.5 # Max 30
 
     # 2. Profile Links (10 pts)
     for link, pts in PROFILE_LINKS.items():
@@ -148,30 +151,29 @@ def analyze_text(text: str) -> dict:
         else:
             suggestions.append(f"Add your {link.capitalize()} profile link")
 
-    # 3. Keyword Coverage (30 pts)
+    # 3. Keyword Coverage (40 pts)
     all_found, all_missing = [], []
     categories_covered = 0
     for cat, keywords in KEYWORD_CATEGORIES.items():
         found = [kw for kw in keywords if kw in lower]
-        missing = [kw for kw in keywords if kw not in lower]
         if found:
             categories_covered += 1
             all_found.extend(found)
-        all_missing.extend(missing)
+        all_missing.extend([kw for kw in keywords if kw not in lower])
 
-    score += min(categories_covered * 5, 30)
-    if categories_covered >= 3:
-        strengths.append("Strong coverage of multiple technology domains")
-    elif categories_covered >= 1:
-        strengths.append("Contains relevant technical keywords")
+    score += min(len(set(all_found)) * 1.5, 40) # Real industry breadth
+    if categories_covered >= 4:
+        strengths.append("Exceptional technical breadth across domains")
+    elif categories_covered >= 2:
+        strengths.append("Good domain coverage (Backend, Frontend, etc.)")
 
-    # 4. Impact Score via spaCy (20 pts)
+    # 4. Impact Score via spaCy (30 pts)
     action_count = count_action_verbs(doc)
     quantified = count_quantified_achievements(text)
     passive_count = count_passive_phrases(text)
 
-    impact_score = min((action_count * 2) + (quantified * 3), 20)
-    impact_score = max(impact_score - (passive_count * 2), 0)
+    impact_score = min((action_count * 3) + (quantified * 5), 30)
+    impact_score = max(impact_score - (passive_count * 3), 0)
     score += impact_score
 
     if action_count >= 5:

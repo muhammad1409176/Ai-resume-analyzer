@@ -44,6 +44,7 @@ function App() {
   const [interviewResult, setInterviewResult] = useState(null);
   const [loadingCoach, setLoadingCoach] = useState(false);
   const [isWakingUp, setIsWakingUp] = useState(false);
+  const [analysisLogs, setAnalysisLogs] = useState([]);
 
   const [scoreDistribution, setScoreDistribution] = useState([
     { range: "0-20", count: 0 },
@@ -292,6 +293,28 @@ function App() {
         <h1>AI Resume Analyzer</h1>
         <p className="subtitle">Advanced analytics and career insights platform.</p>
       </header>
+
+      {loading && (
+        <div className="analysis-overlay">
+          <div className="analysis-terminal">
+            <div className="terminal-header">
+              <span className="dot red"></span>
+              <span className="dot yellow"></span>
+              <span className="dot green"></span>
+              <span className="terminal-title">AI Scanner v2.0 - Real-time Analysis</span>
+            </div>
+            <div className="terminal-body">
+              {analysisLogs.map((log, i) => (
+                <div key={i} className={`log-line ${log.type}`}>
+                  <span className="log-time">[{log.time}]</span>
+                  <span className="log-msg">{log.msg}</span>
+                </div>
+              ))}
+              <div className="cursor">_</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {adminStats && adminStats.totalResumes > 0 ? (
         <>
