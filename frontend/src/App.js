@@ -133,10 +133,10 @@ function App() {
   useEffect(() => {
     const wakeTimer = setTimeout(() => setIsWakingUp(true), 5000);
 
-    // Ping backend
-    const p1 = axios.post(`${API_BASE_URL}/auth/validate`, {}, { timeout: 60000 });
-    // Ping AI service
-    const p2 = axios.get(CONFIG.AI_SERVICE_URL, { timeout: 60000 });
+    // Ping backend (silently pre-warm)
+    const p1 = axios.post(`${API_BASE_URL}/auth/validate`, {}, { timeout: 60000 }).catch(() => { });
+    // Ping AI service (silently pre-warm)
+    const p2 = axios.get(CONFIG.AI_SERVICE_URL, { timeout: 60000 }).catch(() => { });
 
     Promise.allSettled([p1, p2]).finally(() => {
       clearTimeout(wakeTimer);
