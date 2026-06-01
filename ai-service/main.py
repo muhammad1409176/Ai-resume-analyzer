@@ -41,7 +41,7 @@ app.add_middleware(
 KEYWORD_CATEGORIES = {
     "languages":  ["java", "python", "javascript", "typescript", "go", "rust", "c++", "c#", "kotlin", "swift", "php", "ruby", "perl", "r", "dart", "c", "cobol", "fortran", "basic"],
     "frontend":   ["react", "angular", "vue", "html", "css", "sass", "redux", "nextjs", "tailwind", "bootstrap", "jquery", "svelte", "webpack", "babel", "vite"],
-    "backend":    ["spring boot", "spring", "fastapi", "django", "node", "express", "rest api", "graphql", "flask", "asp.net", "laravel", "microservices", "grpc", "soap", ".net framework", "com", "corba", "rpc"],
+    "backend":    ["spring boot", "spring", "fastapi", "django", "node", "express", "rest api", "graphql", "flask", "asp.net", "laravel", "microservices", "grpc", "soap", ".net framework", "com", "corba", "rpc", "win32"],
     "databases":  ["sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch", "cassandra", "dynamodb", "oracle", "sqlite", "mariadb", "firebase", "dbase"],
     "cloud_devops":["aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "terraform", "ansible", "ci/cd", "github actions", "gitlab ci", "circleci", "nginx", "helm", "prometheous", "grafana"],
     "mobile":     ["react native", "flutter", "ios", "android", "swiftui", "objective-c"],
@@ -51,8 +51,8 @@ KEYWORD_CATEGORIES = {
 }
 
 REQUIRED_SECTIONS = {
-    "skills":     ["skills", "technical skills", "computer skills", "tech stack", "competencies", "strengths", "technical expertise", "packages/methodologies/\ntools"],
-    "experience": ["experience", "experience:", "work experience", "employment", "professional background", "work history", "career history", "professional experience", "internships", "internship", "trainings", "career summary", "professional summary", "summary", "experience: (cont.)"],
+    "skills":     ["skills", "technical skills", "computer skills", "tech stack", "competencies", "strengths", "technical expertise", "packages/methodologies/tools"],
+    "experience": ["experience", "work experience", "employment", "professional background", "work history", "career history", "professional experience", "internships", "internship", "trainings", "career summary", "professional summary", "summary"],
     "projects":   ["project", "projects", "personal projects", "academic projects", "key projects", "notable projects"],
     "education":  ["education", "degree", "university", "bachelor", "master", "academic background", "qualifications", "academic credentials", "instruction"],
 }
@@ -74,14 +74,10 @@ VARIANTS = {
     "communication": ["verbal communication", "written communication", "presentation skills"],
     "php": ["lamp", "codeigniter", "laravel"],
     "java": ["j2ee", "spring boot", "spring"],
+    "c": ["language c", "programming in c"],
 }
 
-ACTION_VERBS = [
-    "achieved", "built", "created", "delivered", "designed", "developed",
-    "drove", "engineered", "established", "grew", "implemented", "improved",
-    "increased", "launched", "led", "managed", "optimized", "reduced",
-    "scaled", "shipped", "spearheaded", "streamlined", "analyzed", "planned", "scheduled"
-]
+ACTION_VERBS = ["achieved", "built", "created", "delivered", "designed", "developed", "drove", "engineered", "established", "grew", "implemented", "improved", "increased", "launched", "led", "managed", "optimized", "reduced", "scaled", "shipped", "spearheaded", "streamlined", "analyzed", "planned", "scheduled"]
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 def validate_pdf(file: UploadFile):
@@ -96,19 +92,18 @@ def extract_text_from_pdf(file_path: str) -> str:
     try:
         doc = fitz.open(file_path)
         text = ""
-        for page in doc:
-            text += page.get_text()
+        for page in doc: text += page.get_text()
         doc.close()
         return text
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Failed to parse PDF: {str(e)}")
+    except Exception as e: raise HTTPException(status_code=422, detail=f"Failed to parse PDF: {str(e)}")
 
 def contains_skill(text: str, skill: str) -> bool:
     text_lower = text.lower()
-    if skill in text_lower:
+    pattern = rf'\b{re.escape(skill)}\b'
+    if re.search(pattern, text_lower):
         return True
     for variant in VARIANTS.get(skill, []):
-        if variant in text_lower:
+        if re.search(rf'\b{re.escape(variant)}\b', text_lower):
             return True
     return False
 
@@ -128,7 +123,6 @@ def analyze_text(text: str) -> dict:
     category_counts = Counter()
     all_found = set()
 
-    # 1. Section Case-Insensitive Regex Detection
     lines = [L.strip() for L in text.split('\n') if len(L.strip()) > 2]
     for section, keywords in REQUIRED_SECTIONS.items():
         found = False
@@ -144,7 +138,6 @@ def analyze_text(text: str) -> dict:
         else:
             suggestions.append(f"Add a dedicated {section.capitalize()} section")
 
-    # 2. Tech Analysis
     for cat, keywords in KEYWORD_CATEGORIES.items():
         found = [kw for kw in keywords if contains_skill(lower, kw)]
         if found:
@@ -157,19 +150,14 @@ def analyze_text(text: str) -> dict:
     if "linkedin" in lower: score += 5
     else: suggestions.append("Add your LinkedIn profile link")
 
-    # 3. Impact
     action_count = sum(1 for t in doc if t.lemma_.lower() in ACTION_VERBS and t.pos_ == "VERB")
     quantified = count_quantified_achievements(text)
     score += min((action_count * 2) + (quantified * 3), 20)
 
-    if action_count >= 5: strengths.append(f"Uses {action_count} strong action verbs")
-    if quantified >= 3: strengths.append(f"{quantified} quantified achievements found")
-
-    # missing keywords for growth areas
     missing = []
     for cat, _ in category_counts.most_common(2):
         missing.extend([kw for kw in KEYWORD_CATEGORIES[cat] if kw not in all_found][:2])
-    if not missing: missing = ["AWS", "Docker", "Go", "Kubernetes"]
+    if not missing: missing = ["AWS", "Docker", "Kubernetes", "Python"]
 
     return {
         "score": min(round(score, 1), 100),
@@ -204,7 +192,7 @@ async def endpoint_match(file: UploadFile = File(...), job_description: str = Fo
         matched = [s for s in jd_skills if contains_skill(res_lower, s)]
         missing = [s for s in jd_skills if s not in matched]
         pct = int((len(matched)/len(jd_skills))*100) if jd_skills else 0
-        return {"match_percentage": pct, "matched_keywords": matched, "missing_keywords": missing, "career_recommendations": ["Full Stack Developer"]}
+        return {"match_percentage": pct, "matched_keywords": matched, "missing_keywords": missing, "career_recommendations": ["Software Engineer"]}
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
@@ -214,25 +202,15 @@ async def endpoint_interview(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
         temp.write(await file.read()); temp_path = temp.name
     try:
-        analysis = analyze_text(extract_text_from_pdf(temp_path))
+        res_text = extract_text_from_pdf(temp_path)
+        analysis = analyze_text(res_text)
         persona = analysis["nlp_insights"]["persona"]
-        
-        main_focus = list(persona.keys())[0] if persona else "behavioral"
+        main_focus = list(persona.keys())[0] if persona else "general"
         questions = [
-            {
-                "id": 1,
-                "type": "Technical",
-                "question": f"Based on your {main_focus} experience, walk me through the most significant technical trade-off you had to make in a project.",
-                "tip": "Focus on the 'Why' - mention cost, performance, or time complexity."
-            },
-            {
-                "id": 2,
-                "type": "Leadership",
-                "question": "Tell me about a time you mentored a junior developer or influenced a project architecture.",
-                "tip": "Highlight your communication skills and ability to look at the big picture."
-            }
+            {"id": 1, "type": "Technical", "question": f"Given your {main_focus} focus, explain a complex technical architecture you've designed.", "tip": "Focus on scalability and efficiency."},
+            {"id": 2, "type": "Behavioral", "question": "Walk me through how you handled a situation where you had to lead under pressure.", "tip": "Highlight prioritization and team collaboration."}
         ]
-        return {"questions": questions, "overallAdvice": "Your technical breadth is impressive. Focus on narrative impact."}
+        return {"questions": questions, "overall_advice": "Focus on communicating your architectural logic and impact metrics."}
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
@@ -245,26 +223,15 @@ async def endpoint_optimize(file: UploadFile = File(...)):
         res_text = extract_text_from_pdf(temp_path)
         analysis = analyze_text(res_text)
         opts = []
-        
-        if analysis["score"] < 80:
-            opts.append({
-                "category": "PRECISION",
-                "current": "Legacy resume formatting with dense text blocks.",
-                "suggestion": "Your resume is excellent, but consider customizing keywords for each specific job application to hit 100%."
-            })
         if analysis["nlp_insights"]["quantified"] < 10:
-            opts.append({
-                "category": "IMPACT",
-                "current": "Generic project descriptions missing high-level data.",
-                "suggestion": "Quantify your achievements: 'Managed a team of 12+' or 'Saved $1million in cost'."
-            })
-            
+            opts.append({"category": "IMPACT", "current": "General role descriptions missing metrics.", "suggestion": "Quantify your achievements: 'Managed 12+ developers' or 'Saved $1million in cost'."})
+        if not any(link in res_text.lower() for link in ["github", "linkedin"]):
+            opts.append({"category": "LINKS", "current": "Missing professional social links.", "suggestion": "Ensure your GitHub and LinkedIn are clickable in the header."})
         if not opts:
-            opts = [{"category": "POLISH", "current": "Strong profile foundation.", "suggestion": "Add more niche technical certifications to the header."}]
-
-        return {"optimizations": opts[:2], "overallTip": "Standardize your section headers for 100% ATS compatibility."}
+            opts = [{"category": "POLISH", "current": "High-quality foundation.", "suggestion": "Add niche technical certifications or open-source contributions."}]
+        return {"optimizations": opts[:2], "overall_tip": "Standardize your section headers and focus on quantitative data for 100% compatibility."}
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
 @app.get("/")
-def root(): return {"message": "CareerIQ AI v4.1 - UI Aligned"}
+def root(): return {"message": "CareerIQ AI v4.3 - Logic Final"}
