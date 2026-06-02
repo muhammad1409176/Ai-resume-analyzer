@@ -30,8 +30,8 @@ public class SecurityConfig {
                         .securityContextRepository(new RequestAttributeSecurityContextRepository())
                         .requireExplicitSave(false))
                 .authorizeHttpRequests(auth -> auth
-                        // Only login endpoint is fully public
-                        .requestMatchers("/api/auth/login").permitAll()
+                        // Only login endpoint and ping are fully public
+                        .requestMatchers("/api/auth/login", "/api/auth/ping").permitAll()
                         // Token validation can be called by the frontend on startup
                         .requestMatchers("/api/auth/validate").permitAll()
                         // Resume upload & analysis — public (candidates don't need accounts)

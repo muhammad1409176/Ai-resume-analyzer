@@ -134,7 +134,7 @@ function App() {
     const wakeTimer = setTimeout(() => setIsWakingUp(true), 5000);
 
     // Ping backend (silently pre-warm)
-    const p1 = axios.post(`${API_BASE_URL}/auth/validate`, {}, { timeout: 60000 }).catch(() => { });
+    const p1 = axios.get(`${API_BASE_URL}/auth/ping`, { timeout: 60000 }).catch(() => { });
     // Ping AI service (silently pre-warm)
     const p2 = axios.get(CONFIG.AI_SERVICE_URL, { timeout: 60000 }).catch(() => { });
 

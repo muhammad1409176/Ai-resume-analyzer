@@ -58,6 +58,11 @@ public class AuthController {
                 .body(Map.of("error", "Invalid credentials"));
     }
 
+    @GetMapping("/ping")
+    public ResponseEntity<?> ping() {
+        return ResponseEntity.ok(Map.of("status", "OK", "message", "Server is awake"));
+    }
+
     @PostMapping("/validate")
     public ResponseEntity<?> validateToken(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
