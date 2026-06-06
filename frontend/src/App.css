@@ -569,3 +569,148 @@ button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── NER Entities Box ─────────────────────────────────────────────────────── */
+.entities-box {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.entities-box h3 {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.entities-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entity-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.entity-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 90px;
+  padding-top: 4px;
+}
+
+.entity-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.entity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.entity-tag {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.entity-tag.org {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #818cf8;
+}
+
+.entity-tag.date {
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  color: #2dd4bf;
+}
+
+/* ── Semantic Score Breakdown Bars ───────────────────────────────────────── */
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  margin-bottom: 28px;
+}
+
+.breakdown-item {
+  display: grid;
+  grid-template-columns: 160px 1fr 48px;
+  align-items: center;
+  gap: 12px;
+}
+
+.breakdown-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.breakdown-bar-wrap {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.breakdown-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.breakdown-bar.semantic {
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+}
+
+.breakdown-bar.keyword {
+  background: linear-gradient(90deg, #14b8a6, #06b6d4);
+}
+
+.breakdown-pct {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: white;
+  text-align: right;
+}
+
+/* ── result-card career recommendations (light theme) ─────────────────────── */
+.result-card .career-recommendations {
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.result-card .career-recommendations h3 {
+  color: var(--text-main);
+  margin-bottom: 12px;
+}
+
+.result-card .role-link-btn {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #818cf8;
+}
+
+.result-card .role-link-btn:hover {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.analysis-col.growth-areas ul li {
+  border-left-color: var(--secondary);
+}

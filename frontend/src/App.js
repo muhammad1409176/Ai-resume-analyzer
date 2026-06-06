@@ -508,6 +508,55 @@ function App() {
             <p className="word-count-label">Word Count: {result.word_count}</p>
           </div>
 
+          {/* NER Entity Extraction */}
+          {result.entities && (result.entities.companies?.length > 0 || result.entities.dates?.length > 0) && (
+            <div className="entities-box">
+              <h3>Extracted Profile Info</h3>
+              <div className="entities-grid">
+                {result.entities.name && result.entities.name !== "Candidate" && (
+                  <div className="entity-group">
+                    <span className="entity-label">Candidate</span>
+                    <span className="entity-value">{result.entities.name}</span>
+                  </div>
+                )}
+                {result.entities.companies?.length > 0 && (
+                  <div className="entity-group">
+                    <span className="entity-label">Organizations</span>
+                    <div className="entity-tags">
+                      {result.entities.companies.map((c, i) => <span key={i} className="entity-tag org">{c}</span>)}
+                    </div>
+                  </div>
+                )}
+                {result.entities.dates?.length > 0 && (
+                  <div className="entity-group">
+                    <span className="entity-label">Timeline</span>
+                    <div className="entity-tags">
+                      {result.entities.dates.map((d, i) => <span key={i} className="entity-tag date">{d}</span>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Career Recommendations from analyze */}
+          {result.career_recommendations?.length > 0 && (
+            <div className="career-recommendations">
+              <h3>Predicted Career Paths</h3>
+              <div className="role-links">
+                {result.career_recommendations.map((role, index) => (
+                  <button
+                    key={index}
+                    onClick={() => window.open(`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(role)}`, "_blank")}
+                    className="role-link-btn"
+                  >
+                    {role} • LinkedIn Jobs
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="analysis-grid">
             <div className="analysis-col">
               <h3>Strengths</h3>
@@ -517,18 +566,11 @@ function App() {
             </div>
 
             <div className="analysis-col growth-areas">
-              <h3>Growth Areas</h3>
+              <h3>Critical Suggestions</h3>
               <ul className="result-list">
-                {(result.missing_keywords || result.missingKeywords)?.map((item, index) => <li key={index}>{item}</li>)}
+                {result.suggestions?.map((item, index) => <li key={index}>{item}</li>)}
               </ul>
             </div>
-          </div>
-
-          <div className="suggestions-box">
-            <h3>Critical Suggestions</h3>
-            <ul className="result-list">
-              {result.suggestions?.map((item, index) => <li key={index}>{item}</li>)}
-            </ul>
           </div>
 
           <OptimizationList
@@ -547,7 +589,25 @@ function App() {
         <div className="match-card">
           <div className="match-header">
             <div className="score-circle highlight">{matchResult.match_percentage}%</div>
-            <p className="stat-label">JOB MATCH ACCURACY</p>
+            <p className="stat-label">JOB MATCH ACCURACY (Blended)</p>
+          </div>
+
+          {/* Semantic Score Breakdown */}
+          <div className="score-breakdown">
+            <div className="breakdown-item">
+              <span className="breakdown-label">🧠 Semantic Similarity</span>
+              <div className="breakdown-bar-wrap">
+                <div className="breakdown-bar semantic" style={{ width: `${matchResult.semantic_score || 0}%` }}></div>
+              </div>
+              <span className="breakdown-pct">{matchResult.semantic_score || 0}%</span>
+            </div>
+            <div className="breakdown-item">
+              <span className="breakdown-label">🔑 Keyword Match</span>
+              <div className="breakdown-bar-wrap">
+                <div className="breakdown-bar keyword" style={{ width: `${matchResult.keyword_score || 0}%` }}></div>
+              </div>
+              <span className="breakdown-pct">{matchResult.keyword_score || 0}%</span>
+            </div>
           </div>
 
           <div className="analysis-grid match-details">
