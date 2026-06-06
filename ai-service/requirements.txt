@@ -1,9 +1,9 @@
 fastapi
 uvicorn
 python-multipart
-PyMuPDF
+PyMuPDF==3.0.2
 numpy
 scikit-learn
 spacy
 sentence-transformers
-torch
+# torch is installed separately in Dockerfile to ensure CPU-only version

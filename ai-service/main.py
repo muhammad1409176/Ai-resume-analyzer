@@ -13,6 +13,14 @@ from sklearn.naive_bayes import MultinomialNB
 from collections import Counter
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
+import torch
+import gc
+
+# ── Memory Optimization ───────────────────────────────────────────────────────
+# Explicitly limit torch memory usage for low-RAM environments like Render Free Tier (512MB)
+torch.set_num_threads(1)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 app = FastAPI()
 
@@ -306,6 +314,7 @@ async def endpoint_analyze(file: UploadFile = File(...)):
         return analyze_text(extract_text_from_pdf(p))
     finally:
         if os.path.exists(p): os.remove(p)
+        gc.collect()
 
 @app.post("/match", dependencies=[Security(verify_api_key)])
 async def endpoint_match(file: UploadFile = File(...), job_description: str = Form(...)):
@@ -344,6 +353,7 @@ async def endpoint_match(file: UploadFile = File(...), job_description: str = Fo
         }
     finally:
         if os.path.exists(p): os.remove(p)
+        gc.collect()
 
 @app.post("/interview-prep", dependencies=[Security(verify_api_key)])
 async def endpoint_interview(file: UploadFile = File(...)):
@@ -392,6 +402,7 @@ async def endpoint_interview(file: UploadFile = File(...)):
         }
     finally:
         if os.path.exists(p): os.remove(p)
+        gc.collect()
 
 @app.post("/optimize", dependencies=[Security(verify_api_key)])
 async def endpoint_optimize(file: UploadFile = File(...)):
@@ -439,6 +450,7 @@ async def endpoint_optimize(file: UploadFile = File(...)):
         return {"optimizations": opts[:3], "overall_tip": "Focus on quantifying achievements in your most recent role for maximum recruiter conversion."}
     finally:
         if os.path.exists(p): os.remove(p)
+        gc.collect()
 
 @app.get("/")
 def root():
