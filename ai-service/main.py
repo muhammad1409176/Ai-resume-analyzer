@@ -11,6 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 from sklearn.naive_bayes import MultinomialNB
 from collections import Counter
+# pyrefly: ignore [missing-import]
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import torch
