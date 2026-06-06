@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 python-multipart
-PyMuPDF==3.0.2
+PyMuPDF
 numpy
 scikit-learn
 spacy
