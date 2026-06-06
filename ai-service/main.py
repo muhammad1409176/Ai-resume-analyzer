@@ -219,21 +219,41 @@ def contains_skill(text: str, skill: str) -> bool:
     return False
 
 def extract_entities(text: str) -> dict:
-    """Use spaCy NER to extract structured information from resume text."""
+    """Use spaCy NER with improved filtering for technical resumes."""
     doc = nlp(text[:nlp.max_length])
+    
+    # Common tech noise that spascy often confuses for ORGs or PERSONs
+    blacklist = {
+        "assembler", "embedded", "software", "system", "level", "language", "resume", 
+        "alumni", "applications", "cellular", "development", "engineering", "intel"
+    }
+    
+    def is_valid(val: str):
+        val_lower = val.lower().strip()
+        if len(val_lower) < 3: return False
+        if any(word in val_lower.split() for word in blacklist): return False
+        if re.search(r'\d', val): return False  # Real names/orgs usually don't have digits in this context
+        return True
+
     companies = list(dict.fromkeys([
         ent.text.strip() for ent in doc.ents
-        if ent.label_ == "ORG" and len(ent.text.strip()) > 2
+        if ent.label_ == "ORG" and is_valid(ent.text)
     ]))[:5]
+
     dates = list(dict.fromkeys([
         ent.text.strip() for ent in doc.ents
         if ent.label_ == "DATE" and len(ent.text.strip()) > 3
     ]))[:6]
+
+    # Name detection: Look for PERSON label, but must be very high confidence (no tech words)
     persons = [
         ent.text.strip() for ent in doc.ents
-        if ent.label_ == "PERSON" and len(ent.text.strip()) > 3
+        if ent.label_ == "PERSON" and is_valid(ent.text) and len(ent.text.split()) >= 2
     ]
-    candidate_name = persons[0] if persons else "Candidate"
+    
+    # Fallback: If no good person name found by NER, take the first line of the resume (often the name)
+    candidate_name = persons[0] if persons else text.split('\n')[0].strip()[:30]
+    
     return {"name": candidate_name, "companies": companies, "dates": dates}
 
 # ── Core Analysis Engine ──────────────────────────────────────────────────────
