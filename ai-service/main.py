@@ -56,13 +56,14 @@ async def verify_api_key(key: str = Security(api_key_header)):
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://resume-analyzer-frontend.onrender.com", # Update with real production URL if known
-    "https://*.onrender.com"
+    "https://resume-analyzer-frontend-qj7l.onrender.com",
+    "https://resume-analyzer-frontend.onrender.com"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
