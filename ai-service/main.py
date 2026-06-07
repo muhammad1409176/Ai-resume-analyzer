@@ -251,30 +251,39 @@ def extract_entities(text: str) -> dict:
     """Use spaCy NER with improved filtering for technical resumes."""
     doc = nlp(text[:nlp.max_length])
     
-    # Common tech noise that spacy often confuses for ORGs or PERSONs
+    # Extreme noise filtering for technical resumes (OS, Protocols, Common Software)
     blacklist = {
         "assembler", "embedded", "software", "system", "level", "language", "resume", 
         "alumni", "applications", "cellular", "development", "engineering", "intel",
         "university", "college", "school", "institute", "technologies", "solutions",
         "profile", "summary", "objective", "projects", "experience", "education",
         "skills", "technical", "personal", "contact", "details", "information",
-        "certification", "award", "honor", "volunteer", "activity", "interest"
+        "certification", "award", "honor", "volunteer", "activity", "interest",
+        "unix", "linux", "qnx", "mtos", "orbix", "corba", "macos", "windows", "ios", 
+        "android", "vms", "vxworks", "rtos", "scada", "api", "rest", "soap", "http",
+        "protocol", "standard", "framework", "library", "toolkit", "platform"
     }
     
     def is_valid_name_or_org(val: str):
         val_lower = val.lower().strip()
         if len(val_lower) < 3: return False
         
-        # Remove if it contains any word from the blacklist
+        # Remove if it contains any word from the blacklist (case-insensitive)
         words = set(re.findall(r'\b\w+\b', val_lower))
         if words.intersection(blacklist): return False
         
         # Remove if it contains digits (usually noise/id/version)
         if re.search(r'\d', val): return False 
         
-        # Remove if it's just a common role or skill found in categories
-        if any(val_lower == s.lower() for kws in KEYWORD_CATEGORIES.values() for s in kws):
-            return False
+        # Remove if it's just a common role or skill found in ANY of the categories
+        # Also check partial matches for common skills
+        for kws in KEYWORD_CATEGORIES.values():
+            for s in kws:
+                if val_lower == s.lower(): return False
+                # If the entity is part of a longer skill name or vice versa (e.g. "React" in "React JS")
+                if len(val_lower) > 3 and (val_lower in s.lower() or s.lower() in val_lower):
+                    if s.lower() in ["java", "python", "javascript"]: continue # Allow these if they are exact but already caught
+                    return False
             
         return True
 
