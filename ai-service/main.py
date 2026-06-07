@@ -309,7 +309,7 @@ def analyze_text(text: str) -> dict:
     found_skills_list = []
     all_found = set()
 
-    # 1. Section Detection (Deterministic: 35 points max)
+    # 1. Section Detection (Deterministic: 30 points max)
     lines = [L.strip() for L in text.split('\n') if len(L.strip()) > 2]
     section_points = 0
     for section, keywords in REQUIRED_SECTIONS.items():
@@ -320,12 +320,12 @@ def analyze_text(text: str) -> dict:
                 found = True; break
         if found:
             strengths.append(f"Includes {section} section")
-            section_points += 8.75
+            section_points += 7.5
         else:
             suggestions.append(f"Add a dedicated {section.capitalize()} section")
-    score += min(section_points, 35)
+    score += min(section_points, 30)
 
-    # 2. Semantic Skill Detection (Deterministic: 35 points max)
+    # 2. Semantic Skill Detection (Deterministic: 40 points max)
     for cat, keywords in KEYWORD_CATEGORIES.items():
         found = [kw for kw in keywords if contains_skill(lower, kw)]
         if found:
@@ -333,19 +333,20 @@ def analyze_text(text: str) -> dict:
             category_counts[cat] = len(found)
             found_skills_list.extend(found)
 
-    score += min(len(all_found) * 2.0, 35)
+    # 1.5 pts per skill, max 40 (reached at ~27 skills)
+    score += min(len(all_found) * 1.5, 40)
     
     # 3. Branding & Links (Deterministic: 10 points)
-    if "github.com" in lower: score += 5
+    if "github.com" in lower or "github.io" in lower: score += 5
     if "linkedin.com" in lower: score += 5
 
     # 4. Quantified Impact & Verbs (Deterministic: 20 points max)
     quantified = len(re.findall(r'\b\d+[\%\+x]?\b|\$[\d,]+[KMB]?', text, re.IGNORECASE))
-    score += min((quantified * 4), 10)
+    score += min((quantified * 2.5), 10) # Max 10 pts for metrics (4+ metrics)
     if quantified >= 3: strengths.append(f"{quantified} quantified achievements found")
 
     used_verbs = [v for v in ACTION_VERBS if re.search(rf'\b{v}\b', lower)]
-    score += min(len(used_verbs) * 2, 10)
+    score += min(len(used_verbs) * 1.5, 10) # Max 10 pts for action verbs
     if len(used_verbs) >= 3:
         strengths.append(f"Strong action verbs used")
 
@@ -361,9 +362,10 @@ def analyze_text(text: str) -> dict:
     missing_skills = [s for s in req_skills if not contains_skill(lower, s)]
 
     # Final logic for strengths/suggestions
-    if score > 80:
+    final_score = min(round(score, 1), 100)
+    if final_score > 80:
         strengths.append("High ATS compatibility")
-    elif score < 60:
+    elif final_score < 60:
         suggestions.append("Increase technical keyword density")
 
     return {
@@ -373,13 +375,13 @@ def analyze_text(text: str) -> dict:
         "organizations": entities["organizations"],
         "timeline": entities["timeline"],
         "predicted_role": primary_role,
-        "role_score": min(round(score, 1), 100),
+        "role_score": final_score,
         "missing_skills": missing_skills[:7],
         "strengths": strengths[:4],
         "suggestions": suggestions[:4],
 
         # OLD STRUCTURE (for backward compatibility with frontend/backend)
-        "score": min(round(score, 1), 100),
+        "score": final_score,
         "word_count": len(text.split()),
         "entities": {
             "name": entities["name"],
@@ -387,6 +389,7 @@ def analyze_text(text: str) -> dict:
             "dates": entities["timeline"]
         },
         "career_recommendations": [primary_role],
+        "missing_keywords": missing_skills[:7], # RESTORED FOR BACKEND
         "nlp_insights": {
             "persona": dict(category_counts),
             "quantified": quantified,
