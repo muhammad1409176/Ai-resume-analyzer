@@ -604,4 +604,4 @@ Sincerely,
 
 @app.get("/")
 def root():
-    return {"message": "CareerIQ AI v5.0 — Semantic Engine (sentence-transformers + spaCy NER + sklearn)"}
+    return {"status": "online", "message": "Semantic AI Resume Analyzer Service"}
