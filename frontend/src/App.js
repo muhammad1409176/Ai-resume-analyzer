@@ -186,8 +186,7 @@ function App() {
 
       const response = await axios.post(
         `${API_BASE_URL}/resumes/upload-and-analyze`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        formData
       );
 
       addLog("Analysis complete! Ranking results...", "success");
@@ -223,8 +222,7 @@ function App() {
 
       const response = await axios.post(
         `${API_BASE_URL}/resumes/match-job`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        formData
       );
 
       addLog("Job Match complete!", "success");
@@ -259,8 +257,7 @@ function App() {
 
       const response = await axios.post(
         `${API_BASE_URL}/resumes/optimize`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        formData
       );
 
       addLog("Optimization scripts generated!", "success");
@@ -295,8 +292,7 @@ function App() {
 
       const response = await axios.post(
         `${API_BASE_URL}/resumes/interview-prep`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        formData
       );
 
       addLog("Coach is ready!", "success");
@@ -318,8 +314,7 @@ function App() {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/resumes/generate-report`, formData, {
-        responseType: "blob",
-        headers: { "Content-Type": "multipart/form-data" },
+        responseType: "blob"
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
