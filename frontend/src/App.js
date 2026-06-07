@@ -4,7 +4,10 @@ import "./App.css";
 import AdminLogin from "./components/AdminLogin";
 import OptimizationList from "./components/OptimizationList";
 import InterviewCoach from "./components/InterviewCoach";
+import CoverLetterGenerator from "./components/CoverLetterGenerator";
 import CONFIG from "./config";
+import { toast, Toaster } from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -164,7 +167,7 @@ function App() {
 
   const analyzeResume = async () => {
     if (!file) {
-      alert("Please select a PDF resume.");
+      toast.error("Please select a PDF resume.");
       return;
     }
 
@@ -188,20 +191,21 @@ function App() {
       );
 
       addLog("Analysis complete! Ranking results...", "success");
+      toast.success("Resume analyzed successfully!");
       setTimeout(() => {
         setResult(response.data);
         setIsAnalyzing(false);
       }, 800);
     } catch (error) {
       addLog("Critical error during analysis.", "error");
-      alert(error.response?.data?.error || "Resume analysis failed.");
+      toast.error(error.response?.data?.error || "Resume analysis failed.");
       setIsAnalyzing(false);
     }
   };
 
   const matchJobDescription = async () => {
     if (!file || !jobDescription.trim()) {
-      alert("Please upload a resume and enter a job description.");
+      toast.error("Please upload a resume and enter a job description.");
       return;
     }
 
@@ -224,20 +228,21 @@ function App() {
       );
 
       addLog("Job Match complete!", "success");
+      toast.success("Job match successful!");
       setTimeout(() => {
         setMatchResult(response.data);
         setIsAnalyzing(false);
       }, 800);
     } catch (error) {
       addLog("Job matching failed.", "error");
-      alert(error.response?.data?.error || "Job matching failed.");
+      toast.error(error.response?.data?.error || "Job matching failed.");
       setIsAnalyzing(false);
     }
   };
 
   const handleOptimize = async () => {
     if (!file) {
-      alert("Please upload a resume first.");
+      toast.error("Please upload a resume first.");
       return;
     }
 
@@ -265,14 +270,14 @@ function App() {
       }, 800);
     } catch (error) {
       addLog("Optimizer failed.", "error");
-      alert("AI optimization failed.");
+      toast.error("AI optimization failed.");
       setIsAnalyzing(false);
     }
   };
 
   const startInterviewPrep = async () => {
     if (!file) {
-      alert("Please upload a resume first.");
+      toast.error("Please upload a resume first.");
       return;
     }
 
@@ -301,7 +306,7 @@ function App() {
       }, 1000);
     } catch (error) {
       addLog("Coach failed.", "error");
-      alert("Interview preparation failed.");
+      toast.error("Interview preparation failed.");
       setIsAnalyzing(false);
     }
   };
@@ -344,6 +349,10 @@ function App() {
 
   return (
     <div className="app-container">
+      <div className="glow-bg"></div>
+      <Toaster position="top-right" toastOptions={{
+        style: { background: "#1e293b", color: "#f8fafc", border: "1px solid rgba(255,255,255,0.1)" }
+      }} />
       <header>
         <h1>AI Resume Analyzer</h1>
         <p className="subtitle">Advanced analytics and career insights platform.</p>
@@ -373,7 +382,7 @@ function App() {
 
       {adminStats && adminStats.totalResumes > 0 ? (
         <>
-          <section className="section dashboard">
+          <section className="section dashboard glass-panel">
             <div className="dashboard-header">
               <h3>Admin Overview</h3>
               <button onClick={handleLogout} className="logout-btn">Sign Out</button>
@@ -472,7 +481,7 @@ function App() {
         </section>
       )}
 
-      <section className="section core-tools">
+      <section className="section core-tools glass-panel">
         <div className="tool-box">
           <label className="tool-label">Upload Resume (PDF)</label>
           <input type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} />
@@ -581,6 +590,11 @@ function App() {
           <InterviewCoach
             questions={interviewResult?.questions}
             overallAdvice={interviewResult?.overall_advice}
+          />
+
+          <CoverLetterGenerator
+            file={file}
+            jobDescription={jobDescription}
           />
         </div>
       )}

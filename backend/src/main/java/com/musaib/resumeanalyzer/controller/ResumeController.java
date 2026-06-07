@@ -86,6 +86,14 @@ public class ResumeController {
         return resumeService.generateInterviewQuestions(file);
     }
 
+    @PostMapping("/generate-cover-letter")
+    public Map<String, Object> generateCoverLetter(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("job_description") String jobDescription) throws IOException {
+        validatePdfFile(file);
+        return resumeService.generateCoverLetter(file, jobDescription);
+    }
+
     // ── Global exception handler for validation and service errors ───────────
     @ExceptionHandler({ IllegalArgumentException.class, RuntimeException.class })
     public ResponseEntity<Map<String, String>> handleErrors(Exception ex) {

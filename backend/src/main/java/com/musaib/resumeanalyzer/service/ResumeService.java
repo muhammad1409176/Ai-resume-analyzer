@@ -211,6 +211,23 @@ public class ResumeService {
         }
     }
 
+    public Map<String, Object> generateCoverLetter(MultipartFile file, String jobDescription) throws IOException {
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+        String safeFileName = UUID.randomUUID() + ".pdf";
+        Path filePath = uploadPath.resolve(safeFileName);
+
+        try {
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            byte[] fileBytes = Files.readAllBytes(filePath);
+            return callAiService("/generate-cover-letter", safeFileName, fileBytes, jobDescription);
+        } finally {
+            Files.deleteIfExists(filePath);
+        }
+    }
+
     // ── Generate PDF Report (uses analyzeFile to avoid double save) ──────────
     public byte[] generatePdfReport(MultipartFile file) throws Exception {
         Map<String, Object> analysis = analyzeFile(file);

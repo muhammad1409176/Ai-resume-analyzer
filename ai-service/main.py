@@ -40,19 +40,31 @@ embedder = SentenceTransformer("all-MiniLM-L6-v2")
 print("[AI] Semantic model ready.")
 
 # ── API Key Authentication ────────────────────────────────────────────────────
-API_KEY = os.environ.get("AI_SERVICE_KEY", "dev-internal-key-change-in-production")
+API_KEY = os.environ.get("AI_SERVICE_KEY")
+if not API_KEY:
+    print("[CRITICAL] AI_SERVICE_KEY not found in environment!")
+    # In production, we should probably exit, but for dev we'll use a placeholder
+    # API_KEY = "dev-internal-key-change-in-production" 
+    
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def verify_api_key(key: str = Security(api_key_header)):
     if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-# CORS
+# CORS Lockdown
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://resume-analyzer-frontend.onrender.com", # Update with real production URL if known
+    "https://*.onrender.com"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -553,6 +565,47 @@ async def endpoint_optimize(file: UploadFile = File(...)):
             opts = [{"category": "ELITE", "current": "Strong narrative overall.", "suggestion": "Consider adding specific cloud deployment metrics (e.g., '99.9% uptime on AWS ECS') to reach elite tier."}]
 
         return {"optimizations": opts[:3], "overall_tip": "Focus on quantifying achievements in your most recent role for maximum recruiter conversion."}
+    finally:
+        if os.path.exists(p): os.remove(p)
+        gc.collect()
+
+@app.post("/generate-cover-letter", dependencies=[Security(verify_api_key)])
+async def endpoint_cover_letter(file: UploadFile = File(...), job_description: str = Form(...)):
+    validate_pdf(file)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
+        temp.write(await file.read()); p = temp.name
+    try:
+        text = extract_text_from_pdf(p)
+        analysis = analyze_text(text)
+        
+        # ── Tailoring Logic ───────────────────────────────────────────────────
+        name = analysis["candidate_name"] or "Candidate"
+        role = analysis["predicted_role"]
+        skills = ", ".join(analysis["skills"][:5])
+        
+        # Extract JD keywords for personalization
+        jd_lower = job_description.lower()
+        shared_skills = [s for s in analysis["skills"] if s.lower() in jd_lower]
+        skill_ref = f"Having extensive experience in {', '.join(shared_skills[:3])}" if shared_skills else f"With my strong background in {skills}"
+        
+        # Quantified achievement inclusion
+        metrics = re.findall(r'\b\d+\%|\b\d+\+ roles|\$[\d,]+', text)
+        metric_str = f" My career is punctuated by measurable successes, such as {metrics[0]} improvement in my previous role." if metrics else ""
+
+        letter = f"""Dear Hiring Team,
+
+I am writing to express my strong interest in the {role} position as advertised. {skill_ref}, I am confident in my ability to contribute immediate value to your organization.
+
+Throughout my career, I have developed a robust expertise in {skills}.{metric_str} I am particularly impressed by your company's commitment to innovation, and I am eager to apply my technical problem-solving skills to help achieve your mission.
+
+My background in {role} has equipped me with a unique perspective on optimizing workflows and delivering high-quality solutions. I am a collaborative team player who thrives in fast-paced environments, and I am excited about the possibility of bringing my dedication to your team.
+
+Thank you for your time and consideration. I look forward to the possibility of discussing my application with you further.
+
+Sincerely,
+{name}"""
+
+        return {"cover_letter": letter.strip()}
     finally:
         if os.path.exists(p): os.remove(p)
         gc.collect()

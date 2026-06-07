@@ -1,13 +1,14 @@
 :root {
-  --primary: #6366f1;
-  --primary-glow: rgba(99, 102, 241, 0.4);
-  --secondary: #a855f7;
-  --bg-dark: #0f172a;
-  --card-bg: rgba(30, 41, 59, 0.7);
+  --primary: #818cf8;
+  --primary-glow: rgba(129, 140, 248, 0.4);
+  --secondary: #c084fc;
+  --bg-dark: #020617;
+  --card-bg: rgba(15, 23, 42, 0.6);
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --border: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.08);
   --glass: rgba(255, 255, 255, 0.03);
+  --accent-glow: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 80%);
 }
 
 body {
@@ -45,24 +46,53 @@ h1 {
 }
 
 /* Glass Cards */
-.section,
-.chart-card,
-.result-card,
-.match-card {
+.glass-panel {
   background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 32px;
-  margin-bottom: 24px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
-.section:hover,
-.chart-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+.glow-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--accent-glow);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Premium Typography */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 4rem;
+  letter-spacing: -0.04em;
+  margin-bottom: 0;
+}
+
+.subtitle {
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+/* Micro-interactions */
+.stat-item {
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.stat-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-5px);
 }
 
 .section h3,
