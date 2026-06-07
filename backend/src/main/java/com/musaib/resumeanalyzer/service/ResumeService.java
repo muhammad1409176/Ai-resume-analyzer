@@ -399,13 +399,31 @@ public class ResumeService {
     // ── Helper for PDFBox line writing ───────────────────────────────────────
     private float writeLine(PDPageContentStream cs, PDType1Font font, float fontSize,
             float x, float y, String text) throws IOException {
-        if (y < 60)
+        if (y < 60 || text == null || text.isBlank())
             return y;
-        cs.beginText();
-        cs.setFont(font, fontSize);
-        cs.newLineAtOffset(x, y);
-        cs.showText(text);
-        cs.endText();
+
+        // Sanitize text for PDFBox (Standard 14 Fonts only support WinAnsiEncoding)
+        // Remove newlines and non-printable characters
+        String sanitized = text.replaceAll("[\\n\\r\\t]", " ")
+                .replaceAll("[^\\x20-\\x7E]", ""); // Keep only printable ASCII
+
+        if (sanitized.isBlank())
+            return y;
+
+        try {
+            cs.beginText();
+            cs.setFont(font, fontSize);
+            cs.newLineAtOffset(x, y);
+            cs.showText(sanitized);
+            cs.endText();
+        } catch (Exception e) {
+            System.err.println(">>> ResumeService: PDF Write Error for text [" + sanitized + "]: " + e.getMessage());
+            // Ensure we don't leave the text stream open if possible
+            try {
+                cs.endText();
+            } catch (Exception ignored) {
+            }
+        }
         return y - 18;
     }
 }
