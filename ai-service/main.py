@@ -255,27 +255,34 @@ def extract_entities(text: str) -> dict:
     blacklist = {
         "assembler", "embedded", "software", "system", "level", "language", "resume", 
         "alumni", "applications", "cellular", "development", "engineering", "intel",
-        "university", "college", "school", "institute", "technologies", "solutions"
+        "university", "college", "school", "institute", "technologies", "solutions",
+        "profile", "summary", "objective", "projects", "experience", "education",
+        "skills", "technical", "personal", "contact", "details", "information",
+        "certification", "award", "honor", "volunteer", "activity", "interest"
     }
     
     def is_valid_name_or_org(val: str):
         val_lower = val.lower().strip()
         if len(val_lower) < 3: return False
-        # Remove if it's just a common word or tech noise
-        if any(word == val_lower for word in blacklist): return False
+        
+        # Remove if it contains any word from the blacklist
+        words = set(re.findall(r'\b\w+\b', val_lower))
+        if words.intersection(blacklist): return False
+        
         # Remove if it contains digits (usually noise/id/version)
         if re.search(r'\d', val): return False 
+        
+        # Remove if it's just a common role or skill found in categories
+        if any(val_lower == s.lower() for kws in KEYWORD_CATEGORIES.values() for s in kws):
+            return False
+            
         return True
 
     # CLEANER ORGANIZATIONS (Companies only)
     candidate_companies = []
     for ent in doc.ents:
         if ent.label_ == "ORG" and is_valid_name_or_org(ent.text):
-            name = ent.text.strip()
-            # Filter out things that are actually skills (from KEYWORD_CATEGORIES)
-            is_skill = any(name.lower() in [s.lower() for s in kws] for kws in KEYWORD_CATEGORIES.values())
-            if not is_skill:
-                candidate_companies.append(name)
+            candidate_companies.append(ent.text.strip())
     
     companies = list(dict.fromkeys(candidate_companies))[:5]
 
@@ -289,16 +296,21 @@ def extract_entities(text: str) -> dict:
         if ent.label_ == "PERSON" and is_valid_name_or_org(ent.text) and len(ent.text.split()) >= 2
     ]
     
-    # Heuristic: Name is usually in the first 2 lines
-    first_two_lines = "\n".join(text.split('\n')[:2]).strip()
+    # Heuristic: Name is usually in the first 3 lines
+    first_three_lines = "\n".join(text.split('\n')[:3]).strip()
     candidate_name = ""
     for p in persons:
-        if p in first_two_lines:
-            candidate_name = p
-            break
+        if p in first_three_lines:
+            # Further filter names: names don't usually have "Assembler" or "Engineer" in them if it's the person name
+            if not any(noise in p.lower() for noise in ["engineer", "developer", "resume", "curriculum", "analyst"]):
+                candidate_name = p
+                break
     
     if not candidate_name and persons:
-        candidate_name = persons[0]
+        # Check if first person found is in first 5 lines
+        first_five_lines = "\n".join(text.split('\n')[:5])
+        if persons[0] in first_five_lines:
+            candidate_name = persons[0]
     
     if not candidate_name:
         # Last resort: first line if it looks like a name (not an email or link)
