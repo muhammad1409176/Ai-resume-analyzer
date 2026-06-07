@@ -219,58 +219,99 @@ def contains_skill(text: str, skill: str) -> bool:
         if re.search(rf'\b{re.escape(v)}\b', text_lower): return True
     return False
 
+# ── Role Requirements for Skill Gap Analysis ──────────────────────────────────
+ROLE_REQUIREMENTS = {
+    "Backend Developer": ["Java", "Spring Boot", "REST API", "MySQL", "Hibernate", "Maven", "Git", "PostgreSQL", "Docker", "Microservices"],
+    "Frontend Developer": ["JavaScript", "TypeScript", "React", "HTML", "CSS", "Next.js", "Redux", "Tailwind", "Git"],
+    "Data Scientist": ["Python", "Machine Learning", "Pandas", "NumPy", "Scikit-Learn", "SQL", "Statistics", "Deep Learning"],
+    "ML Engineer": ["Python", "TensorFlow", "PyTorch", "Machine Learning", "MLOps", "Docker", "Kubernetes"],
+    "Android Developer": ["Kotlin", "Java", "Android SDK", "Jetpack Compose", "Git", "SQLite"],
+    "iOS Developer": ["Swift", "SwiftUI", "Objective-C", "Xcode", "Git", "Core Data"],
+    "DevOps Engineer": ["Docker", "Kubernetes", "AWS", "Terraform", "Jenkins", "CI/CD", "Linux", "Nginx"],
+    "QA Engineer": ["Selenium", "JUnit", "Cypress", "Jest", "Test Automation", "Agile", "Jira"],
+    "Full Stack Developer": ["JavaScript", "React", "Node", "Express", "SQL", "HTML", "CSS", "Git", "REST API"],
+    "Software Engineer": ["Algorithms", "Data Structures", "System Design", "Git", "Unit Testing", "Java", "Python"]
+}
+
+# ── End Role Requirements ───────────────────────────────────────────────────
+
 def extract_entities(text: str) -> dict:
     """Use spaCy NER with improved filtering for technical resumes."""
     doc = nlp(text[:nlp.max_length])
     
-    # Common tech noise that spascy often confuses for ORGs or PERSONs
+    # Common tech noise that spacy often confuses for ORGs or PERSONs
     blacklist = {
         "assembler", "embedded", "software", "system", "level", "language", "resume", 
-        "alumni", "applications", "cellular", "development", "engineering", "intel"
+        "alumni", "applications", "cellular", "development", "engineering", "intel",
+        "university", "college", "school", "institute", "technologies", "solutions"
     }
     
-    def is_valid(val: str):
+    def is_valid_name_or_org(val: str):
         val_lower = val.lower().strip()
         if len(val_lower) < 3: return False
-        if any(word in val_lower.split() for word in blacklist): return False
-        if re.search(r'\d', val): return False  # Real names/orgs usually don't have digits in this context
+        # Remove if it's just a common word or tech noise
+        if any(word == val_lower for word in blacklist): return False
+        # Remove if it contains digits (usually noise/id/version)
+        if re.search(r'\d', val): return False 
         return True
 
-    companies = list(dict.fromkeys([
-        ent.text.strip() for ent in doc.ents
-        if ent.label_ == "ORG" and is_valid(ent.text)
-    ]))[:5]
+    # CLEANER ORGANIZATIONS (Companies only)
+    candidate_companies = []
+    for ent in doc.ents:
+        if ent.label_ == "ORG" and is_valid_name_or_org(ent.text):
+            name = ent.text.strip()
+            # Filter out things that are actually skills (from KEYWORD_CATEGORIES)
+            is_skill = any(name.lower() in [s.lower() for s in kws] for kws in KEYWORD_CATEGORIES.values())
+            if not is_skill:
+                candidate_companies.append(name)
+    
+    companies = list(dict.fromkeys(candidate_companies))[:5]
 
-    dates = list(dict.fromkeys([
-        ent.text.strip() for ent in doc.ents
-        if ent.label_ == "DATE" and len(ent.text.strip()) > 3
-    ]))[:6]
+    # CLEANER TIMELINE (Years only: 20xx)
+    years = re.findall(r'\b(20\d{2}|19\d{2})\b', text)
+    timeline = sorted(list(set(years)), reverse=True)[:6]
 
-    # Name detection: Look for PERSON label, but must be very high confidence (no tech words)
+    # CLEANER NAME DETECTION
     persons = [
         ent.text.strip() for ent in doc.ents
-        if ent.label_ == "PERSON" and is_valid(ent.text) and len(ent.text.split()) >= 2
+        if ent.label_ == "PERSON" and is_valid_name_or_org(ent.text) and len(ent.text.split()) >= 2
     ]
     
-    # Fallback: If no good person name found by NER, take the first line of the resume (often the name)
-    candidate_name = persons[0] if persons else text.split('\n')[0].strip()[:30]
+    # Heuristic: Name is usually in the first 2 lines
+    first_two_lines = "\n".join(text.split('\n')[:2]).strip()
+    candidate_name = ""
+    for p in persons:
+        if p in first_two_lines:
+            candidate_name = p
+            break
     
-    return {"name": candidate_name, "companies": companies, "dates": dates}
+    if not candidate_name and persons:
+        candidate_name = persons[0]
+    
+    if not candidate_name:
+        # Last resort: first line if it looks like a name (not an email or link)
+        first_line = text.split('\n')[0].strip()
+        if len(first_line) > 3 and "@" not in first_line and "/" not in first_line:
+            candidate_name = first_line[:30]
+        else:
+            candidate_name = "Candidate"
+    
+    return {"name": candidate_name[:40], "organizations": companies, "timeline": timeline}
 
 # ── Core Analysis Engine ──────────────────────────────────────────────────────
 def analyze_text(text: str) -> dict:
     normalized = re.sub(r'\s+', ' ', text).strip()
     lower = normalized.lower()
-    doc = nlp(normalized[:nlp.max_length])
-
+    
     score = 0
     strengths, suggestions = [], []
     category_counts = Counter()
     found_skills_list = []
     all_found = set()
 
-    # 1. Section Detection
+    # 1. Section Detection (Deterministic: 35 points max)
     lines = [L.strip() for L in text.split('\n') if len(L.strip()) > 2]
+    section_points = 0
     for section, keywords in REQUIRED_SECTIONS.items():
         found = False
         for kw in keywords:
@@ -279,11 +320,12 @@ def analyze_text(text: str) -> dict:
                 found = True; break
         if found:
             strengths.append(f"Includes {section} section")
-            score += 8.75
+            section_points += 8.75
         else:
             suggestions.append(f"Add a dedicated {section.capitalize()} section")
+    score += min(section_points, 35)
 
-    # 2. Semantic Skill Detection
+    # 2. Semantic Skill Detection (Deterministic: 35 points max)
     for cat, keywords in KEYWORD_CATEGORIES.items():
         found = [kw for kw in keywords if contains_skill(lower, kw)]
         if found:
@@ -291,38 +333,49 @@ def analyze_text(text: str) -> dict:
             category_counts[cat] = len(found)
             found_skills_list.extend(found)
 
-    score += min(len(all_found) * 1.5, 35)
-    if "github" in lower: score += 5
-    if "linkedin" in lower: score += 5
+    score += min(len(all_found) * 2.0, 35)
+    
+    # 3. Branding & Links (Deterministic: 10 points)
+    if "github.com" in lower: score += 5
+    if "linkedin.com" in lower: score += 5
 
-    # 3. Quantified Impact Detection
+    # 4. Quantified Impact & Verbs (Deterministic: 20 points max)
     quantified = len(re.findall(r'\b\d+[\%\+x]?\b|\$[\d,]+[KMB]?', text, re.IGNORECASE))
-    score += min((quantified * 4), 20)
+    score += min((quantified * 4), 10)
     if quantified >= 3: strengths.append(f"{quantified} quantified achievements found")
 
-    # 4. Action Verb Detection
     used_verbs = [v for v in ACTION_VERBS if re.search(rf'\b{v}\b', lower)]
+    score += min(len(used_verbs) * 2, 10)
     if len(used_verbs) >= 3:
-        strengths.append(f"Strong action verbs used ({', '.join(used_verbs[:3])} ...)")
+        strengths.append(f"Strong action verbs used")
 
-    # 5. spaCy NER Entities
+    # 5. Entity Extraction (Name, Companies, Timeline)
     entities = extract_entities(text)
 
-    # 6. Predict Roles
+    # 6. Role Prediction & Skill Gap
     predicted_roles = predict_roles(found_skills_list, category_counts)
+    primary_role = predicted_roles[0] if predicted_roles else "Software Engineer"
+    
+    # Calculate Missing Skills based on Primary Role
+    req_skills = ROLE_REQUIREMENTS.get(primary_role, ROLE_REQUIREMENTS["Software Engineer"])
+    missing_skills = [s for s in req_skills if not contains_skill(lower, s)]
+
+    # Final logic for strengths/suggestions
+    if score > 80:
+        strengths.append("High ATS compatibility")
+    elif score < 60:
+        suggestions.append("Increase technical keyword density")
 
     return {
-        "score": min(round(score, 1), 100),
-        "word_count": len(text.split()),
-        "strengths": strengths,
-        "suggestions": suggestions,
-        "entities": entities,
-        "career_recommendations": predicted_roles,
-        "nlp_insights": {
-            "persona": dict(category_counts),
-            "quantified": quantified,
-            "found_skills": found_skills_list
-        }
+        "candidate_name": entities["name"],
+        "skills": list(all_found),
+        "organizations": entities["organizations"],
+        "timeline": entities["timeline"],
+        "predicted_role": primary_role,
+        "role_score": min(round(score, 1), 100),
+        "missing_skills": missing_skills[:7], # Top 7 missing
+        "strengths": strengths[:4],
+        "suggestions": suggestions[:4]
     }
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -345,7 +398,7 @@ async def endpoint_match(file: UploadFile = File(...), job_description: str = Fo
     try:
         res_text = extract_text_from_pdf(p)
         analysis = analyze_text(res_text)
-        found = set(analysis["nlp_insights"]["found_skills"])
+        found = set(analysis["skills"])
         job_lower = job_description.lower()
 
         # Keyword-level match
@@ -370,7 +423,7 @@ async def endpoint_match(file: UploadFile = File(...), job_description: str = Fo
             "keyword_score":       keyword_pct,
             "matched_keywords":    matched,
             "missing_keywords":    missing,
-            "career_recommendations": analysis["career_recommendations"],
+            "career_recommendations": [analysis["predicted_role"]],
         }
     finally:
         if os.path.exists(p): os.remove(p)
@@ -383,14 +436,20 @@ async def endpoint_interview(file: UploadFile = File(...)):
         temp.write(await file.read()); p = temp.name
     try:
         analysis = analyze_text(extract_text_from_pdf(p))
-        skills  = analysis["nlp_insights"]["found_skills"]
-        persona = analysis["nlp_insights"]["persona"]  # {category: count}
-
+        skills  = analysis["skills"]
+        
         questions = []
         q_id = 1
 
+        # Derive categories from found skills for question generation
+        persona = Counter()
+        for cat, keywords in KEYWORD_CATEGORIES.items():
+            found = [s for s in skills if s in keywords]
+            if found:
+                persona[cat] = len(found)
+
         # Generate questions from top detected categories
-        top_cats = [cat for cat, _ in Counter(persona).most_common(4)]
+        top_cats = [cat for cat, _ in persona.most_common(4)]
         for cat in top_cats:
             cat_skills = [s for s in skills if contains_skill(
                 " ".join(KEYWORD_CATEGORIES.get(cat, [])), s
@@ -414,7 +473,7 @@ async def endpoint_interview(file: UploadFile = File(...)):
                 {"id": 2, "type": "Behavioral", "question": "Describe a time you had to learn a new technology under pressure.", "tip": "Mention the outcome."},
             ]
 
-        top_role = analysis["career_recommendations"][0] if analysis["career_recommendations"] else "Software Engineer"
+        top_role = analysis["predicted_role"]
         top_skill = skills[0].capitalize() if skills else "Technical Skills"
 
         return {
@@ -444,20 +503,26 @@ async def endpoint_optimize(file: UploadFile = File(...)):
         ]
         weak_bullet = random.choice(weak_bullets) if weak_bullets else (sentences[0] if sentences else "Developed various software components.")
 
-        if analysis["score"] < 80:
+        if analysis["role_score"] < 80:
             opts.append({
                 "category": "IMPACT",
                 "current":  weak_bullet,
                 "suggestion": "Rewrite with metrics: 'Optimized system performance by 30%, reducing API response time from 800ms to 200ms.'"
             })
-        if not any(link in text.lower() for link in ["github", "linkedin"]):
+        if not any(link in text.lower() for link in ["github.com", "linkedin.com"]):
             opts.append({
                 "category": "LINKS",
                 "current":  "Missing professional branding links.",
                 "suggestion": "Add clickable LinkedIn and GitHub URLs to your header. Recruiters spend 6s scanning — make them count."
             })
-        if len(analysis["nlp_insights"]["found_skills"]) < 8:
-            missing_cats = [c for c in KEYWORD_CATEGORIES if c not in analysis["nlp_insights"]["persona"]]
+        if len(analysis["skills"]) < 8:
+            # Re-derive categories to find missing ones
+            persona = Counter()
+            for cat, keywords in KEYWORD_CATEGORIES.items():
+                found = [s for s in analysis["skills"] if s in keywords]
+                if found: persona[cat] = len(found)
+                
+            missing_cats = [c for c in KEYWORD_CATEGORIES if c not in persona]
             if missing_cats:
                 sample = random.choice(KEYWORD_CATEGORIES[missing_cats[0]])
                 opts.append({

@@ -16,9 +16,10 @@ def test_analyze():
     response = requests.post(f"{BASE_URL}/analyze", headers=HEADERS, files=files)
     if response.status_code == 200:
         data = response.json()
-        print(f"Score: {data['score']}")
-        print(f"Entities: {data['entities']}")
-        print(f"Recommendations: {data['career_recommendations']}")
+        print(f"Role Score: {data['role_score']}")
+        print(f"Name: {data['candidate_name']}")
+        print(f"Predicted Role: {data['predicted_role']}")
+        print(f"Missing Skills: {data['missing_skills']}")
     else:
         print(f"Error: {response.status_code} - {response.text}")
 
