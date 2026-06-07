@@ -367,15 +367,31 @@ def analyze_text(text: str) -> dict:
         suggestions.append("Increase technical keyword density")
 
     return {
+        # NEW STRUCTURE (for future use/requested spec)
         "candidate_name": entities["name"],
         "skills": list(all_found),
         "organizations": entities["organizations"],
         "timeline": entities["timeline"],
         "predicted_role": primary_role,
         "role_score": min(round(score, 1), 100),
-        "missing_skills": missing_skills[:7], # Top 7 missing
+        "missing_skills": missing_skills[:7],
         "strengths": strengths[:4],
-        "suggestions": suggestions[:4]
+        "suggestions": suggestions[:4],
+
+        # OLD STRUCTURE (for backward compatibility with frontend/backend)
+        "score": min(round(score, 1), 100),
+        "word_count": len(text.split()),
+        "entities": {
+            "name": entities["name"],
+            "companies": entities["organizations"],
+            "dates": entities["timeline"]
+        },
+        "career_recommendations": [primary_role],
+        "nlp_insights": {
+            "persona": dict(category_counts),
+            "quantified": quantified,
+            "found_skills": found_skills_list
+        }
     }
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
