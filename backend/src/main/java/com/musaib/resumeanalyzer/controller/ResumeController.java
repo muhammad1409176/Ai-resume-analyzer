@@ -27,12 +27,23 @@ public class ResumeController {
         }
         String originalName = file.getOriginalFilename();
         if (originalName == null || !originalName.toLowerCase().endsWith(".pdf")) {
-            throw new IllegalArgumentException("Only PDF files are accepted");
+            throw new IllegalArgumentException("Only PDF files are accepted. Found: " + originalName);
         }
         String contentType = file.getContentType();
-        if (contentType != null && !contentType.equals("application/pdf")
-                && !contentType.equals("application/octet-stream")) {
-            throw new IllegalArgumentException("Invalid file type. Only PDF is accepted");
+        System.out.println(
+                ">>> ResumeController: Validating file [" + originalName + "] Content-Type: [" + contentType + "]");
+
+        List<String> validTypes = List.of(
+                "application/pdf",
+                "application/x-pdf",
+                "application/acrobat",
+                "applications/vnd.pdf",
+                "text/pdf",
+                "text/x-pdf",
+                "application/octet-stream");
+
+        if (contentType != null && !validTypes.contains(contentType)) {
+            throw new IllegalArgumentException("Invalid file type [" + contentType + "]. Only PDF is accepted");
         }
     }
 
@@ -97,6 +108,7 @@ public class ResumeController {
     // ── Global exception handler for validation and service errors ───────────
     @ExceptionHandler({ IllegalArgumentException.class, RuntimeException.class })
     public ResponseEntity<Map<String, String>> handleErrors(Exception ex) {
+        System.err.println(">>> ResumeController Error: " + ex.getMessage());
         HttpStatus status = (ex instanceof IllegalArgumentException) ? HttpStatus.BAD_REQUEST
                 : HttpStatus.INTERNAL_SERVER_ERROR;
         return ResponseEntity.status(status).body(Map.of("error", ex.getMessage()));
