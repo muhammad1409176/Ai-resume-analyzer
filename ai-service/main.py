@@ -248,88 +248,58 @@ ROLE_REQUIREMENTS = {
 # ── End Role Requirements ───────────────────────────────────────────────────
 
 def extract_entities(text: str) -> dict:
-    """Use spaCy NER with improved filtering for technical resumes."""
+    """Use strict rules for technical resume entity extraction."""
     doc = nlp(text[:nlp.max_length])
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
     
-    # Extreme noise filtering for technical resumes (OS, Protocols, Common Software)
-    blacklist = {
-        "assembler", "embedded", "software", "system", "level", "language", "resume", 
-        "alumni", "applications", "cellular", "development", "engineering", "intel",
-        "university", "college", "school", "institute", "technologies", "solutions",
-        "profile", "summary", "objective", "projects", "experience", "education",
-        "skills", "technical", "personal", "contact", "details", "information",
-        "certification", "award", "honor", "volunteer", "activity", "interest",
-        "unix", "linux", "qnx", "mtos", "orbix", "corba", "macos", "windows", "ios", 
-        "android", "vms", "vxworks", "rtos", "scada", "api", "rest", "soap", "http",
-        "protocol", "standard", "framework", "library", "toolkit", "platform"
-    }
-    
-    def is_valid_name_or_org(val: str):
-        val_lower = val.lower().strip()
-        if len(val_lower) < 3: return False
-        
-        # Remove if it contains any word from the blacklist (case-insensitive)
-        words = set(re.findall(r'\b\w+\b', val_lower))
-        if words.intersection(blacklist): return False
-        
-        # Remove if it contains digits (usually noise/id/version)
-        if re.search(r'\d', val): return False 
-        
-        # Remove if it's just a common role or skill found in ANY of the categories
-        # Also check partial matches for common skills
-        for kws in KEYWORD_CATEGORIES.values():
-            for s in kws:
-                if val_lower == s.lower(): return False
-                # If the entity is part of a longer skill name or vice versa (e.g. "React" in "React JS")
-                if len(val_lower) > 3 and (val_lower in s.lower() or s.lower() in val_lower):
-                    if s.lower() in ["java", "python", "javascript"]: continue # Allow these if they are exact but already caught
-                    return False
-            
-        return True
+    # 1. CANDIDATE NAME: From the very first line only.
+    # Skip if it contains @, /, http, or digits.
+    candidate_name = "Candidate"
+    if lines:
+        first_line = lines[0]
+        if not any(char in first_line for char in ['@', '/', 'http']) and not any(char.isdigit() for char in first_line):
+            if 3 < len(first_line) < 40:
+                candidate_name = first_line
 
-    # CLEANER ORGANIZATIONS (Companies only)
+    # 2. ORGANIZATIONS: Strict skill-collision check
     candidate_companies = []
-    for ent in doc.ents:
-        if ent.label_ == "ORG" and is_valid_name_or_org(ent.text):
-            candidate_companies.append(ent.text.strip())
     
+    # Flatten all skills for easy lookup
+    all_known_skills = set()
+    for category_skills in KEYWORD_CATEGORIES.values():
+        for s in category_skills:
+            all_known_skills.add(s.lower())
+
+    for ent in doc.ents:
+        if ent.label_ == "ORG":
+            name = ent.text.strip()
+            name_lower = name.lower()
+            
+            # Skip if length too short
+            if len(name_lower) < 3: continue
+            
+            # Skip if it's in KEYWORD_CATEGORIES
+            if name_lower in all_known_skills: continue
+            
+            # Skip if it's a single word and matches common tech terms (blacklist from earlier)
+            tech_noise = {"mfc", "dec", "ibm", "qnx", "unix", "linux", "os", "windows", "ios", "android", "mac", "assembler", "embedded", "software", "system", "level", "language", "applications", "orbix", "corba", "installshield"}
+            if name_lower in tech_noise: continue
+            
+            # If multi-word, check if any word is in the tech noise blacklist
+            words = set(re.findall(r'\b\w+\b', name_lower))
+            if words.intersection(tech_noise): continue
+
+            candidate_companies.append(name)
+    
+    # Remove duplicates and take top 5
     companies = list(dict.fromkeys(candidate_companies))[:5]
 
-    # CLEANER TIMELINE (Years only: 20xx)
-    years = re.findall(r'\b(20\d{2}|19\d{2})\b', text)
-    timeline = sorted(list(set(years)), reverse=True)[:6]
+    # 3. TIMELINE: 2010 onwards, sort latest first, max 4 years.
+    years = re.findall(r'\b(20\d{2})\b', text)
+    valid_years = [y for y in set(years) if int(y) >= 2010]
+    timeline = sorted(valid_years, reverse=True)[:4]
 
-    # CLEANER NAME DETECTION
-    persons = [
-        ent.text.strip() for ent in doc.ents
-        if ent.label_ == "PERSON" and is_valid_name_or_org(ent.text) and len(ent.text.split()) >= 2
-    ]
-    
-    # Heuristic: Name is usually in the first 3 lines
-    first_three_lines = "\n".join(text.split('\n')[:3]).strip()
-    candidate_name = ""
-    for p in persons:
-        if p in first_three_lines:
-            # Further filter names: names don't usually have "Assembler" or "Engineer" in them if it's the person name
-            if not any(noise in p.lower() for noise in ["engineer", "developer", "resume", "curriculum", "analyst"]):
-                candidate_name = p
-                break
-    
-    if not candidate_name and persons:
-        # Check if first person found is in first 5 lines
-        first_five_lines = "\n".join(text.split('\n')[:5])
-        if persons[0] in first_five_lines:
-            candidate_name = persons[0]
-    
-    if not candidate_name:
-        # Last resort: first line if it looks like a name (not an email or link)
-        first_line = text.split('\n')[0].strip()
-        if len(first_line) > 3 and "@" not in first_line and "/" not in first_line:
-            candidate_name = first_line[:30]
-        else:
-            candidate_name = "Candidate"
-    
-    return {"name": candidate_name[:40], "organizations": companies, "timeline": timeline}
+    return {"name": candidate_name, "organizations": companies, "timeline": timeline}
 
 # ── Core Analysis Engine ──────────────────────────────────────────────────────
 def analyze_text(text: str) -> dict:
